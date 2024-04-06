@@ -137,6 +137,9 @@ class Tile:
 
         return Tile(tile=arg.normalize(), handle=handle)
 
+    def keep_handle(self, arg: TileAsCorners | TileAsSpan) -> "Tile":
+        return Tile.build(arg, handle=self.handle)
+
     @deprecated("I probably don't need it")
     @staticmethod
     def from_cells(cells: Iterable[Cell]) -> "Tile | None":
@@ -296,12 +299,11 @@ class TileGrid:
         delta_cell = Cell(x=0, y=0) - self.origin.as_corners().c1
 
         tiles = tuple(
-            Tile.build(
+            tile.keep_handle(
                 TileAsCorners(
                     c1=tile.as_corners().c1 + delta_cell,
                     c2=tile.as_corners().c2 + delta_cell,
-                ),
-                handle=tile.handle,
+                )
             )
             for tile in self.get_tiles()
         )
@@ -343,22 +345,20 @@ class TileGrid:
                         new_tiles.append(tile)
                     case TileRelationToStripe.NO_INTERSECT_AND_MORE_POSITIVE:
                         new_tiles.append(
-                            Tile.build(
+                            tile.keep_handle(
                                 TileAsCorners(
                                     c1=tile.as_corners().c1 + delta,
                                     c2=tile.as_corners().c2 + delta,
-                                ),
-                                handle=tile.handle,
+                                )
                             )
                         )
                     case TileRelationToStripe.HAVE_COMMON_CELLS:
                         new_tiles.append(
-                            Tile.build(
+                            tile.keep_handle(
                                 TileAsCorners(
                                     c1=tile.as_corners().c1,
                                     c2=tile.as_corners().c2 + delta,
-                                ),
-                                handle=tile.handle,
+                                )
                             )
                         )
             else:  # only executed if the loop did NOT break
