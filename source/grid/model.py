@@ -325,23 +325,19 @@ class TileGrid:
 
         box = self.get_box()
 
-        lines = itertools.chain(
+        for stripe in itertools.chain(
             sorted(box.shred_horizontally(), key=lambda l: l.coordinate, reverse=True),
             sorted(box.shred_vertically(), key=lambda l: l.coordinate, reverse=True),
-        )
-
-        for line in lines:
+        ):
             delta = {
                 Orientation.HORIZONTAL: Cell(x=0, y=-1),
                 Orientation.VERTICAL: Cell(x=-1, y=0),
-            }[line.orientation]
+            }[stripe.orientation]
 
-            skip_line = False
             new_tiles: list[Tile] = []
             for tile in return_.get_tiles():
-                match tile.relation_to_stripe(line):
+                match tile.relation_to_stripe(stripe):
                     case TileRelationToStripe.CONTAINED:
-                        skip_line = True
                         break
                     case TileRelationToStripe.NO_INTERSECT_AND_MORE_NEGATIVE:
                         new_tiles.append(tile)
@@ -351,7 +347,8 @@ class TileGrid:
                                 TileAsCorners(
                                     c1=tile.as_corners().c1 + delta,
                                     c2=tile.as_corners().c2 + delta,
-                                )
+                                ),
+                                handle=tile.handle,
                             )
                         )
                     case TileRelationToStripe.HAVE_COMMON_CELLS:
@@ -360,14 +357,12 @@ class TileGrid:
                                 TileAsCorners(
                                     c1=tile.as_corners().c1,
                                     c2=tile.as_corners().c2 + delta,
-                                )
+                                ),
+                                handle=tile.handle,
                             )
                         )
-
-            if skip_line:
-                continue
-
-            return_ = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+            else:  # only executed if the loop did NOT break
+                return_ = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
         return return_
 
