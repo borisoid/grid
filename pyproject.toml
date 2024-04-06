@@ -1,0 +1,32 @@
+[project]
+name = "grid"
+version = "0.1.0"
+description = "Default template for PDM package"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "borisoid", email = "boris.lazarev01@gmail.com"},
+    {name = "borisoid", email = "boris.lazarev90@mail.ru"},
+]
+
+requires-python = "==3.12.*"
+dependencies = [
+    "pygame>=2.5.2",
+]
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+main = "python -m source.grid"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "mypy>=1.8.0",
+    "pytest>=8.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
