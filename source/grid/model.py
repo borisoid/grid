@@ -239,7 +239,7 @@ class Tile:
             for y in range(tile.c1.y, tile.c2.y + 1)
         )
 
-    def relation_to_stripe(self, line: "Line") -> "TileRelationToStripe":
+    def relation_to_line(self, line: "Line") -> "TileRelationToLine":
         span = self.as_span()
         corners = self.as_corners()
 
@@ -252,7 +252,7 @@ class Tile:
             and (span.span.x == 0)
             and (span.cell.x == line.coordinate)
         ):
-            return TileRelationToStripe.CONTAINED
+            return TileRelationToLine.CONTAINED
 
         if (
             (line.orientation == Orientation.HORIZONTAL)
@@ -261,7 +261,7 @@ class Tile:
             (line.orientation == Orientation.VERTICAL)
             and (line.coordinate < corners.c1.x)
         ):
-            return TileRelationToStripe.NO_INTERSECT_AND_MORE_POSITIVE
+            return TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE
 
         if (
             (line.orientation == Orientation.HORIZONTAL)
@@ -270,9 +270,9 @@ class Tile:
             (line.orientation == Orientation.VERTICAL)
             and (line.coordinate > corners.c2.x)
         ):
-            return TileRelationToStripe.NO_INTERSECT_AND_MORE_NEGATIVE
+            return TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE
 
-        return TileRelationToStripe.HAVE_COMMON_CELLS
+        return TileRelationToLine.HAVE_COMMON_CELLS
 
 
 def get_box(tiles: Iterable[Tile]) -> Tile:
@@ -327,23 +327,23 @@ class TileGrid:
 
         box = self.get_box()
 
-        for stripe in itertools.chain(
+        for line in itertools.chain(
             sorted(box.shred_horizontally(), key=lambda l: l.coordinate, reverse=True),
             sorted(box.shred_vertically(), key=lambda l: l.coordinate, reverse=True),
         ):
             delta = {
                 Orientation.HORIZONTAL: Cell(x=0, y=-1),
                 Orientation.VERTICAL: Cell(x=-1, y=0),
-            }[stripe.orientation]
+            }[line.orientation]
 
             new_tiles: list[Tile] = []
             for tile in return_.get_tiles():
-                match tile.relation_to_stripe(stripe):
-                    case TileRelationToStripe.CONTAINED:
+                match tile.relation_to_line(line):
+                    case TileRelationToLine.CONTAINED:
                         break
-                    case TileRelationToStripe.NO_INTERSECT_AND_MORE_NEGATIVE:
+                    case TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE:
                         new_tiles.append(tile)
-                    case TileRelationToStripe.NO_INTERSECT_AND_MORE_POSITIVE:
+                    case TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE:
                         new_tiles.append(
                             tile.keep_handle(
                                 TileAsCorners(
@@ -352,7 +352,7 @@ class TileGrid:
                                 )
                             )
                         )
-                    case TileRelationToStripe.HAVE_COMMON_CELLS:
+                    case TileRelationToLine.HAVE_COMMON_CELLS:
                         new_tiles.append(
                             tile.keep_handle(
                                 TileAsCorners(
@@ -384,7 +384,7 @@ class Line:
 # }}} Line
 
 
-class TileRelationToStripe(Enum):
+class TileRelationToLine(Enum):
     NO_INTERSECT_AND_MORE_NEGATIVE = auto()
     NO_INTERSECT_AND_MORE_POSITIVE = auto()
     HAVE_COMMON_CELLS = auto()
