@@ -24,9 +24,48 @@ main = "python -m source.grid"
 dev = [
     "mypy>=1.8.0",
     "pytest>=8.1.1",
+    "black>=24.3.0",
+    "isort>=5.13.2",
 ]
 
 [tool.pytest.ini_options]
 testpaths = [
     "tests",
 ]
+
+[tool.pyright]
+pythonVersion = "3.12"
+pythonPlatform = "Linux"
+exclude = [
+    "**/__pycache__",
+]
+strict = ["*"]
+reportWildcardImportFromLibrary = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportShadowedImports = "error"
+reportImplicitOverride = "error"
+reportUninitializedInstanceVariable = "error"
+reportTypeCommentUsage = "error"
+reportMatchNotExhaustive = "error"
+
+[tool.mypy]
+namespace_packages = true
+explicit_package_bases = true
+disallow_untyped_defs = true
+pretty = true
+show_error_codes = true
+exclude = [
+    "^local/.",
+]
+
+[tool.isort]
+profile = "black"
+lines_after_imports = 2
+# line_length = 100
+group_by_package = true
+ensure_newline_before_comments = true
+
+[tool.black]
+line-length = 88  # default
+# line-length = 100
+target-version = ['py312']
