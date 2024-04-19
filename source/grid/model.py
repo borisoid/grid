@@ -348,6 +348,12 @@ class TileGrid:
             sorted(box.shred_horizontally(), key=lambda l: l.coordinate, reverse=True),
             sorted(box.shred_vertically(), key=lambda l: l.coordinate, reverse=True),
         ):
+            if {
+                TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE,
+                TileRelationToLine.EDGE_CONTAINED_REST_MODE_POSITIVE,
+            }.issubset(t.relation_to_line(line) for t in return_.get_tiles()):
+                continue
+
             delta = {
                 Orientation.HORIZONTAL: Cell(x=0, y=-1),
                 Orientation.VERTICAL: Cell(x=-1, y=0),
@@ -369,7 +375,11 @@ class TileGrid:
                                 )
                             )
                         )
-                    case TileRelationToLine.HAVE_COMMON_CELLS:
+                    case (
+                        TileRelationToLine.HAVE_COMMON_CELLS
+                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
+                        | TileRelationToLine.EDGE_CONTAINED_REST_MODE_POSITIVE
+                    ):
                         new_tiles.append(
                             tile.keep_handle(
                                 TileAsCorners(
@@ -476,6 +486,8 @@ class TileRelationToLine(Enum):
     NO_INTERSECT_AND_MORE_POSITIVE = auto()
     HAVE_COMMON_CELLS = auto()
     CONTAINED = auto()
+    EDGE_CONTAINED_REST_MORE_NEGATIVE = auto()
+    EDGE_CONTAINED_REST_MODE_POSITIVE = auto()
 
 
 def get_grid_section(*, cell: Cell, origin_tile: Tile) -> GridSection:
