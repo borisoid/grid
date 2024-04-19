@@ -261,7 +261,7 @@ class Tile:
             and (span.span.x == 0)
             and (span.cell.x == line.coordinate)
         ):
-            return TileRelationToLine.CONTAINED
+            return TileRelationToLine.FULLY_CONTAINED
 
         if (
             (line.orientation == Orientation.HORIZONTAL)
@@ -280,6 +280,24 @@ class Tile:
             and (line.coordinate > corners.c2.x)
         ):
             return TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE
+        
+        if (
+            (line.orientation == Orientation.HORIZONTAL)
+            and (line.coordinate == corners.c1.y)
+        ) or (
+            (line.orientation == Orientation.VERTICAL)
+            and (line.coordinate == corners.c1.x)
+        ):
+            return TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
+        
+        if (
+            (line.orientation == Orientation.HORIZONTAL)
+            and (line.coordinate == corners.c2.y)
+        ) or (
+            (line.orientation == Orientation.VERTICAL)
+            and (line.coordinate == corners.c2.x)
+        ):
+            return TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
 
         return TileRelationToLine.HAVE_COMMON_CELLS
 
@@ -332,14 +350,6 @@ class TileGrid:
         return box_cells - tiles_cells
 
     def compact(self) -> "TileGrid":
-        """
-        "shear line" problem:
-
-        112 -> 12
-        344    34
-
-        """
-
         return_ = self
 
         box = self.get_box()
@@ -350,7 +360,7 @@ class TileGrid:
         ):
             if {
                 TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE,
-                TileRelationToLine.EDGE_CONTAINED_REST_MODE_POSITIVE,
+                TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE,
             }.issubset(t.relation_to_line(line) for t in return_.get_tiles()):
                 continue
 
@@ -362,7 +372,7 @@ class TileGrid:
             new_tiles: list[Tile] = []
             for tile in return_.get_tiles():
                 match tile.relation_to_line(line):
-                    case TileRelationToLine.CONTAINED:
+                    case TileRelationToLine.FULLY_CONTAINED:
                         break
                     case TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE:
                         new_tiles.append(tile)
@@ -378,7 +388,7 @@ class TileGrid:
                     case (
                         TileRelationToLine.HAVE_COMMON_CELLS
                         | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MODE_POSITIVE
+                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
                     ):
                         new_tiles.append(
                             tile.keep_handle(
@@ -485,9 +495,9 @@ class TileRelationToLine(Enum):
     NO_INTERSECT_AND_MORE_NEGATIVE = auto()
     NO_INTERSECT_AND_MORE_POSITIVE = auto()
     HAVE_COMMON_CELLS = auto()
-    CONTAINED = auto()
+    FULLY_CONTAINED = auto()
     EDGE_CONTAINED_REST_MORE_NEGATIVE = auto()
-    EDGE_CONTAINED_REST_MODE_POSITIVE = auto()
+    EDGE_CONTAINED_REST_MORE_POSITIVE = auto()
 
 
 def get_grid_section(*, cell: Cell, origin_tile: Tile) -> GridSection:
