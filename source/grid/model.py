@@ -332,6 +332,14 @@ class TileGrid:
         return box_cells - tiles_cells
 
     def compact(self) -> "TileGrid":
+        """
+        "shear line" problem:
+
+        112 -> 12
+        344    34
+
+        """
+
         return_ = self
 
         box = self.get_box()
