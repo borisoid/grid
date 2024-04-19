@@ -49,7 +49,7 @@ grid_section_inverse = MappingProxyType(
 )
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True, slots=True, eq=True)
 class Cell:
     x: int
     y: int
@@ -176,6 +176,15 @@ class Tile:
     @deprecated("I probably don't need it")
     def contains_cell(self, cell: Cell) -> bool:
         return cell in self.cells()
+
+    def intersection_cells(self, other: "Tile") -> set[Cell]:
+        return set(self.cells()).intersection(other.cells())
+
+    def intersects_with(self, other: "Tile") -> bool:
+        return len(self.intersection_cells(other)) > 0
+
+    def contains_tile(self, other: "Tile") -> bool:
+        return self.intersection_cells(other) == set(other.cells())
 
     def min_max(self: "Tile", other: "Tile", /) -> "Tile":
         tile_1 = self.as_corners()
@@ -365,6 +374,76 @@ class TileGrid:
                 return_ = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
         return return_
+
+    def expand(self) -> "TileGrid":
+        tiles = tuple(self.get_tiles())
+        box = get_box(tiles)
+        new_tiles = list(tiles)
+        for i, tile in enumerate(tiles):
+            current_tiles = new_tiles[:i] + new_tiles[i + 1 :]
+
+            # Try expand right {{{
+            new_tile = tile.keep_handle(
+                TileAsCorners(
+                    c1=tile.as_corners().c1,
+                    c2=tile.as_corners().c2 + Cell(x=1, y=0),
+                )
+            )
+            if (box.contains_tile(new_tile)) and (
+                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
+            ):
+                new_tiles[i] = new_tile
+                continue
+
+            # }}}
+
+            # Try expand down {{{
+            new_tile = tile.keep_handle(
+                TileAsCorners(
+                    c1=tile.as_corners().c1,
+                    c2=tile.as_corners().c2 + Cell(x=0, y=1),
+                )
+            )
+            if (box.contains_tile(new_tile)) and (
+                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
+            ):
+                new_tiles[i] = new_tile
+                continue
+
+            # }}}
+
+            # Try expand left {{{
+            new_tile = tile.keep_handle(
+                TileAsCorners(
+                    c1=tile.as_corners().c1 + Cell(x=-1, y=0),
+                    c2=tile.as_corners().c2,
+                )
+            )
+            if (box.contains_tile(new_tile)) and (
+                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
+            ):
+                new_tiles[i] = new_tile
+                continue
+
+            # }}}
+
+            # Try expand up {{{
+            new_tile = tile.keep_handle(
+                TileAsCorners(
+                    c1=tile.as_corners().c1 + Cell(x=0, y=-1),
+                    c2=tile.as_corners().c2,
+                )
+            )
+            if (box.contains_tile(new_tile)) and (
+                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
+            ):
+                new_tiles[i] = new_tile
+                continue
+            # }}}
+
+            new_tiles[i] = tile
+
+        return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
 
 # Line {{{

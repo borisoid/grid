@@ -244,6 +244,14 @@ def start() -> None:
             if (e.type == pg.KEYDOWN) and (e.key == pg.K_0):
                 # print("Hello")
                 tile_grid = tile_grid.compact().centralize_origin()
+                tile_grid = tile_grid.expand().centralize_origin()
+                tile_grid = tile_grid.compact().centralize_origin()
+
+            if (e.type == pg.KEYDOWN) and (e.key == pg.K_e):
+                tile_grid = tile_grid.expand().centralize_origin()
+
+            if (e.type == pg.KEYDOWN) and (e.key == pg.K_c):
+                tile_grid = tile_grid.compact().centralize_origin()
 
         # Logic {{{
         tiles_translated = [
