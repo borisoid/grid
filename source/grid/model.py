@@ -358,11 +358,15 @@ class TileGrid:
             sorted(box.shred_horizontally(), key=lambda l: l.coordinate, reverse=True),
             sorted(box.shred_vertically(), key=lambda l: l.coordinate, reverse=True),
         ):
+            # {{{ Prevent "shear line" problem. I.e. when
+            # 112 -> 12
+            # 344    34
             if {
                 TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE,
                 TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE,
             }.issubset(t.relation_to_line(line) for t in return_.get_tiles()):
                 continue
+            # }}}
 
             delta = {
                 Orientation.HORIZONTAL: Cell(x=0, y=-1),

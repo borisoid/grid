@@ -229,6 +229,7 @@ def start() -> None:
     )
 
     while True:
+        # Controls {{{
         for e in pg.event.get():
             if (e.type == pg.QUIT) or ((e.type == pg.KEYDOWN) and (e.key == pg.K_q)):
                 sys.exit()
@@ -252,6 +253,8 @@ def start() -> None:
 
             if (e.type == pg.KEYDOWN) and (e.key == pg.K_c):
                 tile_grid = tile_grid.compact().centralize_origin()
+
+        # }}} Controls
 
         # Logic {{{
         tiles_translated = [
