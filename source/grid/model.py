@@ -280,7 +280,7 @@ class Tile:
             and (line.coordinate > corners.c2.x)
         ):
             return TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE
-        
+
         if (
             (line.orientation == Orientation.HORIZONTAL)
             and (line.coordinate == corners.c1.y)
@@ -289,7 +289,7 @@ class Tile:
             and (line.coordinate == corners.c1.x)
         ):
             return TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-        
+
         if (
             (line.orientation == Orientation.HORIZONTAL)
             and (line.coordinate == corners.c2.y)
@@ -414,66 +414,44 @@ class TileGrid:
         for i, tile in enumerate(tiles):
             current_tiles = new_tiles[:i] + new_tiles[i + 1 :]
 
-            # Try expand right {{{
-            new_tile = tile.keep_handle(
-                TileAsCorners(
-                    c1=tile.as_corners().c1,
-                    c2=tile.as_corners().c2 + Cell(x=1, y=0),
-                )
-            )
-            if (box.contains_tile(new_tile)) and (
-                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
+            for new_tile in (
+                # Right
+                tile.keep_handle(
+                    TileAsCorners(
+                        c1=tile.as_corners().c1,
+                        c2=tile.as_corners().c2 + Cell(x=1, y=0),
+                    )
+                ),
+                # Down
+                tile.keep_handle(
+                    TileAsCorners(
+                        c1=tile.as_corners().c1,
+                        c2=tile.as_corners().c2 + Cell(x=0, y=1),
+                    )
+                ),
+                # Left
+                tile.keep_handle(
+                    TileAsCorners(
+                        c1=tile.as_corners().c1 + Cell(x=-1, y=0),
+                        c2=tile.as_corners().c2,
+                    )
+                ),
+                # Up
+                tile.keep_handle(
+                    TileAsCorners(
+                        c1=tile.as_corners().c1 + Cell(x=0, y=-1),
+                        c2=tile.as_corners().c2,
+                    )
+                ),
             ):
-                new_tiles[i] = new_tile
-                continue
+                if (box.contains_tile(new_tile)) and (
+                    not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
+                ):
+                    new_tiles[i] = new_tile
+                    break
 
-            # }}}
-
-            # Try expand down {{{
-            new_tile = tile.keep_handle(
-                TileAsCorners(
-                    c1=tile.as_corners().c1,
-                    c2=tile.as_corners().c2 + Cell(x=0, y=1),
-                )
-            )
-            if (box.contains_tile(new_tile)) and (
-                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
-            ):
-                new_tiles[i] = new_tile
-                continue
-
-            # }}}
-
-            # Try expand left {{{
-            new_tile = tile.keep_handle(
-                TileAsCorners(
-                    c1=tile.as_corners().c1 + Cell(x=-1, y=0),
-                    c2=tile.as_corners().c2,
-                )
-            )
-            if (box.contains_tile(new_tile)) and (
-                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
-            ):
-                new_tiles[i] = new_tile
-                continue
-
-            # }}}
-
-            # Try expand up {{{
-            new_tile = tile.keep_handle(
-                TileAsCorners(
-                    c1=tile.as_corners().c1 + Cell(x=0, y=-1),
-                    c2=tile.as_corners().c2,
-                )
-            )
-            if (box.contains_tile(new_tile)) and (
-                not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
-            ):
-                new_tiles[i] = new_tile
-                continue
-            # }}}
-
-            new_tiles[i] = tile
+            else:  # only executed if the loop did NOT break
+                new_tiles[i] = tile
 
         return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
