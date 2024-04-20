@@ -21,6 +21,8 @@ GRID_LINE_WIDTH = 5
 GRID_LINE_WIDTH_BOLD = 7
 CELL_PADDING = 18
 
+ORIGIN_HANDLE = 0
+
 # Colors {{{
 BLACK = pg.Color(0, 0, 0)
 GREY_20 = pg.Color(20, 20, 20)
@@ -57,8 +59,8 @@ clock = pg.time.Clock()
 screen = pg.display.set_mode(pg.Vector2(WINDOW_WIDTH, WINDOW_HEIGHT))
 
 
-tile_colors = [RED]
-for i, color in zip(range(10), itertools.cycle((GREEN_170, BLUE_150, YELLOW))):
+tile_colors: list[pg.Color] = []
+for i, color in zip(range(10), itertools.cycle((RED, GREEN_170, BLUE_150, YELLOW))):
     tile_colors.append(color)
 
 
@@ -151,17 +153,30 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
 
     # Tiles {{{
 
-    for tile, color in zip((t.as_span() for t in tiles), tile_colors):
+    for tile, color in zip(tiles, tile_colors):
+        tile_as_span = tile.as_span()
         pg.draw.rect(
             surface=screen,
             color=color,
             rect=pg.Rect(
-                (tile.cell.x * CELL_SIDE_LENGTH) + CELL_PADDING,
-                (tile.cell.y * CELL_SIDE_LENGTH) + CELL_PADDING,
-                ((tile.span.x + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
-                ((tile.span.y + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
+                (tile_as_span.cell.x * CELL_SIDE_LENGTH) + CELL_PADDING,
+                (tile_as_span.cell.y * CELL_SIDE_LENGTH) + CELL_PADDING,
+                ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
+                ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
             ),
         )
+
+        if tile.handle == ORIGIN_HANDLE:
+            pg.draw.rect(
+                surface=screen,
+                color=YELLOW,
+                rect=pg.Rect(
+                    (tile_as_span.cell.x * CELL_SIDE_LENGTH) + (CELL_PADDING * 2),
+                    (tile_as_span.cell.y * CELL_SIDE_LENGTH) + (CELL_PADDING * 2),
+                    ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH) - (4 * CELL_PADDING),
+                    ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH) - (4 * CELL_PADDING),
+                ),
+            )
 
     # }}} Tiles
 
@@ -172,7 +187,7 @@ def translate_tile(tile: Tile) -> Tile:
     corners = tile.as_corners()
 
     delta = Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
-    return Tile.build(
+    return tile.keep_handle(
         TileAsCorners(
             c1=corners.c1 + delta,
             c2=corners.c2 + delta,
@@ -192,7 +207,8 @@ def start() -> None:
             TileAsCorners(
                 c1=Cell(x=0, y=-1),
                 c2=Cell(x=0, y=-2),
-            )
+            ),
+            handle=ORIGIN_HANDLE,
         ),
         other=(
             Tile.build(
