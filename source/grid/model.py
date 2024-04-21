@@ -381,7 +381,10 @@ class TileGrid:
         return box_cells - tiles_cells
 
     def get_tile_by_handle(self, handle: int) -> Tile | None:
-        return next(filter(lambda x: x.handle == handle, self.get_tiles()), None)
+        for tile in self.get_tiles():
+            if tile.handle == handle:
+                return tile
+        return None
 
     def rotate_clockwise(self) -> "TileGrid":
         return TileGrid.from_tiles(x.rotate_clockwise() for x in self.get_tiles())
@@ -392,7 +395,7 @@ class TileGrid:
         )
 
     def compact(self) -> "TileGrid":
-        return_ = self
+        current_grid = self
 
         box = self.get_box()
 
@@ -406,7 +409,7 @@ class TileGrid:
             if {
                 TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE,
                 TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE,
-            }.issubset(t.relation_to_line(line) for t in return_.get_tiles()):
+            }.issubset(t.relation_to_line(line) for t in current_grid.get_tiles()):
                 continue
             # }}}
 
@@ -416,7 +419,7 @@ class TileGrid:
             }[line.orientation]
 
             new_tiles: list[Tile] = []
-            for tile in return_.get_tiles():
+            for tile in current_grid.get_tiles():
                 match tile.relation_to_line(line):
                     case TileRelationToLine.FULLY_CONTAINED:
                         break
@@ -445,9 +448,9 @@ class TileGrid:
                             )
                         )
             else:  # only executed if the loop did NOT break
-                return_ = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+                current_grid = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
-        return return_
+        return current_grid
 
     def expand(self) -> "TileGrid":
         tiles = tuple(self.get_tiles())
@@ -500,115 +503,35 @@ class TileGrid:
     def insert(
         self, *, anchor_handle: int, direction: CardinalDirection, new_tile_handle: int
     ) -> "TileGrid":
+        # Guard {{{
         anchor_tile = self.get_tile_by_handle(anchor_handle)
+        if anchor_tile is None:
+            return self
+        # }}}
+
+        # Prepare. Rotate grid so that insert to the RIGHT needs to be done {{{
+        match direction:
+            case CardinalDirection.RIGHT:
+                current_grid = self
+            case CardinalDirection.DOWN:
+                current_grid = self.rotate_counterclockwise()
+            case CardinalDirection.UP:
+                current_grid = self.rotate_clockwise()
+            case CardinalDirection.LEFT:
+                current_grid = self.rotate_counterclockwise().rotate_counterclockwise()
+        # }}}
+
+        anchor_tile = current_grid.get_tile_by_handle(anchor_handle)
         if anchor_tile is None:
             return self
 
         new_tiles: list[Tile] = []
-        for tile in self.get_tiles():
+        # Make space (to the RIGHT) {{{
+        for tile in current_grid.get_tiles():
             if tile.handle == anchor_handle:
                 new_tiles.append(tile)
 
-            elif direction == CardinalDirection.UP:
-                match tile.relation_to_line(
-                    Line(
-                        coordinate=anchor_tile.as_corners().c1.y,
-                        orientation=Orientation.HORIZONTAL,
-                    )
-                ):
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE:
-                        new_tiles.append(tile)
-                    case (
-                        TileRelationToLine.FULLY_CONTAINED
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-                        | TileRelationToLine.HAVE_COMMON_CELLS
-                    ):
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1 + Cell(x=0, y=-1),
-                                    c2=tile.as_corners().c2,
-                                )
-                            )
-                        )
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE:
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1 + Cell(x=0, y=-1),
-                                    c2=tile.as_corners().c2 + Cell(x=0, y=-1),
-                                )
-                            )
-                        )
-
-            elif direction == CardinalDirection.DOWN:
-                match tile.relation_to_line(
-                    Line(
-                        coordinate=anchor_tile.as_corners().c2.y,
-                        orientation=Orientation.HORIZONTAL,
-                    )
-                ):
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE:
-                        new_tiles.append(tile)
-                    case (
-                        TileRelationToLine.FULLY_CONTAINED
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-                        | TileRelationToLine.HAVE_COMMON_CELLS
-                    ):
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1,
-                                    c2=tile.as_corners().c2 + Cell(x=0, y=1),
-                                )
-                            )
-                        )
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE:
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1 + Cell(x=0, y=1),
-                                    c2=tile.as_corners().c2 + Cell(x=0, y=1),
-                                )
-                            )
-                        )
-
-            elif direction == CardinalDirection.LEFT:
-                match tile.relation_to_line(
-                    Line(
-                        coordinate=anchor_tile.as_corners().c1.x,
-                        orientation=Orientation.VERTICAL,
-                    )
-                ):
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE:
-                        new_tiles.append(tile)
-                    case (
-                        TileRelationToLine.FULLY_CONTAINED
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-                        | TileRelationToLine.HAVE_COMMON_CELLS
-                    ):
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1 + Cell(x=-1, y=0),
-                                    c2=tile.as_corners().c2,
-                                )
-                            )
-                        )
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE:
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1 + Cell(x=-1, y=0),
-                                    c2=tile.as_corners().c2 + Cell(x=-1, y=0),
-                                )
-                            )
-                        )
-
-            elif direction == CardinalDirection.RIGHT:
+            else:
                 match tile.relation_to_line(
                     Line(
                         coordinate=anchor_tile.as_corners().c2.x,
@@ -640,49 +563,34 @@ class TileGrid:
                                 )
                             )
                         )
+        # }}}
 
-        if direction == CardinalDirection.UP:
-            new_tiles.append(
-                Tile.build(
-                    TileAsSpan(
-                        cell=anchor_tile.as_corners().c1 + Cell(x=0, y=-1),
-                        span=Cell(x=anchor_tile.as_span().span.x, y=0),
-                    ),
-                    handle=new_tile_handle,
-                )
+        # Insert new Tile (on the RIGHT) {{{
+        new_tiles.append(
+            Tile.build(
+                TileAsSpan(
+                    cell=anchor_tile.as_corners().c2 + Cell(x=1, y=0),
+                    span=Cell(x=0, y=-anchor_tile.as_span().span.y),
+                ),
+                handle=new_tile_handle,
             )
-        elif direction == CardinalDirection.DOWN:
-            new_tiles.append(
-                Tile.build(
-                    TileAsSpan(
-                        cell=anchor_tile.as_corners().c2 + Cell(x=0, y=1),
-                        span=Cell(x=-anchor_tile.as_span().span.x, y=0),
-                    ),
-                    handle=new_tile_handle,
-                )
-            )
-        elif direction == CardinalDirection.LEFT:
-            new_tiles.append(
-                Tile.build(
-                    TileAsSpan(
-                        cell=anchor_tile.as_corners().c1 + Cell(x=-1, y=0),
-                        span=Cell(x=0, y=anchor_tile.as_span().span.y),
-                    ),
-                    handle=new_tile_handle,
-                )
-            )
-        elif direction == CardinalDirection.RIGHT:
-            new_tiles.append(
-                Tile.build(
-                    TileAsSpan(
-                        cell=anchor_tile.as_corners().c2 + Cell(x=1, y=0),
-                        span=Cell(x=0, y=-anchor_tile.as_span().span.y),
-                    ),
-                    handle=new_tile_handle,
-                )
-            )
+        )
+        # }}}
 
-        return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+        current_grid = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+        # Rotate back to original orientation {{{
+        match direction:
+            case CardinalDirection.RIGHT:
+                pass
+            case CardinalDirection.DOWN:
+                current_grid = self.rotate_clockwise()
+            case CardinalDirection.UP:
+                current_grid = self.rotate_counterclockwise()
+            case CardinalDirection.LEFT:
+                current_grid = self.rotate_clockwise().rotate_clockwise()
+        # }}}
+
+        return current_grid
 
 
 # Line {{{
