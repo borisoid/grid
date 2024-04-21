@@ -293,7 +293,7 @@ def start() -> None:
             if (e.type == pg.KEYDOWN) and (e.key == pg.K_i):
                 tile_grid = tile_grid.insert(
                     anchor_handle=ORIGIN_HANDLE,
-                    direction=CardinalDirection.DOWN,
+                    direction=CardinalDirection.RIGHT,
                     new_tile_handle=generate_handle(),
                 ).centralize_origin()
 
