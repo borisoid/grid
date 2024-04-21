@@ -1,10 +1,10 @@
 import itertools
 import sys
-from typing import Iterable
+from typing import Generator, Iterable
 
 import pygame as pg
 
-from .model import Cell, Tile, TileAsCorners, TileGrid, get_box
+from .model import CardinalDirection, Cell, Tile, TileAsCorners, TileGrid, get_box
 
 
 FPS = 24
@@ -20,8 +20,6 @@ CELLS_Y = WINDOW_HEIGHT // CELL_SIDE_LENGTH
 GRID_LINE_WIDTH = 5
 GRID_LINE_WIDTH_BOLD = 7
 CELL_PADDING = 18
-
-ORIGIN_HANDLE = 0
 
 # Colors {{{
 BLACK = pg.Color(0, 0, 0)
@@ -60,8 +58,25 @@ screen = pg.display.set_mode(pg.Vector2(WINDOW_WIDTH, WINDOW_HEIGHT))
 
 
 tile_colors: list[pg.Color] = []
-for i, color in zip(range(10), itertools.cycle((RED, GREEN_170, BLUE_150, YELLOW))):
+for i, color in zip(range(20), itertools.cycle((RED, GREEN_170, BLUE_150))):
     tile_colors.append(color)
+
+
+def handle_generator() -> Generator[int, None, None]:
+    handle = 0
+    while True:
+        yield handle
+        handle += 1
+
+
+HANDLE_GENERATOR = handle_generator()
+
+
+def generate_handle() -> int:
+    return next(HANDLE_GENERATOR)
+
+
+ORIGIN_HANDLE = generate_handle()
 
 
 def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
@@ -215,31 +230,36 @@ def start() -> None:
                 TileAsCorners(
                     c1=Cell(x=0, y=1),
                     c2=Cell(x=1, y=1),
-                )
+                ),
+                handle=generate_handle(),
             ),
             Tile.build(
                 TileAsCorners(
                     c1=Cell(x=-1, y=0),
                     c2=Cell(x=-1, y=1),
-                )
+                ),
+                handle=generate_handle(),
             ),
             Tile.build(
                 TileAsCorners(
                     c1=Cell(x=1, y=-1),
                     c2=Cell(x=1, y=-1),
-                )
+                ),
+                handle=generate_handle(),
             ),
             Tile.build(
                 TileAsCorners(
                     c1=Cell(x=0, y=0),
                     c2=Cell(x=1, y=0),
-                )
+                ),
+                handle=generate_handle(),
             ),
             Tile.build(
                 TileAsCorners(
                     c1=Cell(x=-1, y=-1),
                     c2=Cell(x=-1, y=-1),
-                )
+                ),
+                handle=generate_handle(),
             ),
         ),
     )
@@ -264,11 +284,18 @@ def start() -> None:
                 tile_grid = tile_grid.expand().centralize_origin()
                 tile_grid = tile_grid.compact().centralize_origin()
 
+            if (e.type == pg.KEYDOWN) and (e.key == pg.K_c):
+                tile_grid = tile_grid.compact().centralize_origin()
+
             if (e.type == pg.KEYDOWN) and (e.key == pg.K_e):
                 tile_grid = tile_grid.expand().centralize_origin()
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_c):
-                tile_grid = tile_grid.compact().centralize_origin()
+            if (e.type == pg.KEYDOWN) and (e.key == pg.K_i):
+                tile_grid = tile_grid.insert(
+                    anchor_handle=ORIGIN_HANDLE,
+                    direction=CardinalDirection.DOWN,
+                    new_tile_handle=generate_handle(),
+                ).centralize_origin()
 
         # }}} Controls
 
