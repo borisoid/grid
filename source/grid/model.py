@@ -73,6 +73,12 @@ class Cell:
             y=self.y - other.y,
         )
 
+    def rotate_clockwise(self) -> "Cell":
+        return Cell(x=-self.y, y=self.x)
+
+    def rotate_counterclockwise(self) -> "Cell":
+        return Cell(x=self.y, y=-self.x)
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class TileAsSpan:
@@ -308,6 +314,22 @@ class Tile:
 
         return TileRelationToLine.HAVE_COMMON_CELLS
 
+    def rotate_clockwise(self) -> "Tile":
+        return self.keep_handle(
+            TileAsCorners(
+                c1=self.as_corners().c1.rotate_clockwise(),
+                c2=self.as_corners().c2.rotate_clockwise(),
+            )
+        )
+
+    def rotate_counterclockwise(self) -> "Tile":
+        return self.keep_handle(
+            TileAsCorners(
+                c1=self.as_corners().c1.rotate_counterclockwise(),
+                c2=self.as_corners().c2.rotate_counterclockwise(),
+            )
+        )
+
 
 def get_box(tiles: Iterable[Tile]) -> Tile:
     tiles = tuple(tiles)
@@ -322,6 +344,11 @@ def get_box(tiles: Iterable[Tile]) -> Tile:
 class TileGrid:
     origin: Tile
     other: Sequence[Tile]
+
+    @staticmethod
+    def from_tiles(tiles: Iterable[Tile]) -> "TileGrid":
+        tiles = tuple(tiles)
+        return TileGrid(origin=tiles[0], other=tiles[1:])
 
     def get_tiles(self) -> tuple[Tile, ...]:
         return (self.origin, *self.other)
@@ -342,10 +369,7 @@ class TileGrid:
             for tile in self.get_tiles()
         )
 
-        return TileGrid(
-            origin=tiles[0],
-            other=tiles[1:],
-        )
+        return TileGrid(origin=tiles[0], other=tiles[1:])
 
     def get_uncovered_cells(self) -> set[Cell]:
         tiles = self.get_tiles()
@@ -358,6 +382,14 @@ class TileGrid:
 
     def get_tile_by_handle(self, handle: int) -> Tile | None:
         return next(filter(lambda x: x.handle == handle, self.get_tiles()), None)
+
+    def rotate_clockwise(self) -> "TileGrid":
+        return TileGrid.from_tiles(x.rotate_clockwise() for x in self.get_tiles())
+
+    def rotate_counterclockwise(self) -> "TileGrid":
+        return TileGrid.from_tiles(
+            x.rotate_counterclockwise() for x in self.get_tiles()
+        )
 
     def compact(self) -> "TileGrid":
         return_ = self
@@ -455,7 +487,7 @@ class TileGrid:
                 ),
             ):
                 if (box.contains_tile(new_tile)) and (
-                    not any(map(lambda x: x.intersects_with(new_tile), current_tiles))
+                    not any(x.intersects_with(new_tile) for x in current_tiles)
                 ):
                     new_tiles[i] = new_tile
                     break

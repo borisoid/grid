@@ -297,6 +297,9 @@ def start() -> None:
                     new_tile_handle=generate_handle(),
                 ).centralize_origin()
 
+            if (e.type == pg.KEYDOWN) and (e.key == pg.K_k):
+                tile_grid = tile_grid.rotate_clockwise().centralize_origin()
+
         # }}} Controls
 
         # Logic {{{
