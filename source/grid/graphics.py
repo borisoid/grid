@@ -1,5 +1,6 @@
 import itertools
 import sys
+from enum import Enum
 from typing import Generator, Iterable
 
 import pygame as pg
@@ -210,6 +211,16 @@ def translate_tile(tile: Tile) -> Tile:
     )
 
 
+class Mode(Enum):
+    NORMAL = "NORMAL"
+    DELETE = "DELETE"
+
+    INSERT_UP = "INSERT_UP"
+    INSERT_DOWN = "INSERT_DOWN"
+    INSERT_LEFT = "INSERT_LEFT"
+    INSERT_RIGHT = "INSERT_RIGHT"
+
+
 def start() -> None:
     # for _ in range(2):
     #     clock.tick(FPS)
@@ -264,43 +275,102 @@ def start() -> None:
         ),
     )
 
+    mode = Mode.NORMAL
+    mode_next = mode
     while True:
         # Controls {{{
         for e in pg.event.get():
             if (e.type == pg.QUIT) or ((e.type == pg.KEYDOWN) and (e.key == pg.K_q)):
                 sys.exit()
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_r):
-                tile_grid = ORIGINAL_TILE_GRID
+            if e.type == pg.KEYDOWN:
+                match e.key:
+                    case pg.K_ESCAPE:
+                        if mode == Mode.NORMAL:
+                            sys.exit()
+                        else:
+                            mode_next = Mode.NORMAL
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_d):
-                tile_grid = TileGrid(
-                    origin=tile_grid.origin, other=tile_grid.other[:-1]
-                )
+                    case pg.K_d:
+                        mode_next = Mode.DELETE
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_0):
-                # print("Hello")
-                tile_grid = tile_grid.compact().centralize_origin()
-                tile_grid = tile_grid.expand().centralize_origin()
-                tile_grid = tile_grid.compact().centralize_origin()
+                    case pg.K_h:
+                        mode_next = Mode.INSERT_LEFT
+                    case pg.K_j:
+                        mode_next = Mode.INSERT_DOWN
+                    case pg.K_k:
+                        mode_next = Mode.INSERT_UP
+                    case pg.K_l:
+                        mode_next = Mode.INSERT_RIGHT
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_c):
-                tile_grid = tile_grid.compact().centralize_origin()
+                    case pg.K_0:
+                        tile_grid = tile_grid.compact().centralize_origin()
+                        tile_grid = tile_grid.expand().centralize_origin()
+                        tile_grid = tile_grid.compact().centralize_origin()
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_e):
-                tile_grid = tile_grid.expand().centralize_origin()
+                    case pg.K_c:
+                        tile_grid = tile_grid.compact().centralize_origin()
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_i):
-                tile_grid = tile_grid.insert(
-                    anchor_handle=ORIGIN_HANDLE,
-                    direction=CardinalDirection.RIGHT,
-                    new_tile_handle=generate_handle(),
-                ).centralize_origin()
+                    case pg.K_e:
+                        tile_grid = tile_grid.expand().centralize_origin()
 
-            if (e.type == pg.KEYDOWN) and (e.key == pg.K_k):
-                tile_grid = tile_grid.rotate_clockwise().centralize_origin()
+                    case pg.K_r:
+                        tile_grid = ORIGINAL_TILE_GRID
+
+                    case pg.K_z:
+                        tile_grid = (
+                            tile_grid.rotate_counterclockwise().centralize_origin()
+                        )
+
+                    case pg.K_x:
+                        tile_grid = tile_grid.rotate_clockwise().centralize_origin()
+
+                    case _:
+                        pass
+
+            if e.type == pg.MOUSEBUTTONUP:
+                x, y = e.pos
+
+                selected_tile: Tile | None = None
+                for tile_translated in (
+                    translate_tile(tile)
+                    for tile in tile_grid.centralize_origin().get_tiles()
+                ):
+                    if tile_translated.contains_cell(
+                        Cell(x=x // CELL_SIDE_LENGTH, y=y // CELL_SIDE_LENGTH)
+                    ):
+                        selected_tile = tile_translated
+                        break
+
+                if (selected_tile is not None) and (selected_tile.handle is not None):
+                    match mode:
+                        case Mode.NORMAL:
+                            pass
+                        case Mode.DELETE:
+                            tile_grid = tile_grid.delete_by_handle(selected_tile.handle)
+
+                        case (
+                            Mode.INSERT_UP
+                            | Mode.INSERT_DOWN
+                            | Mode.INSERT_LEFT
+                            | Mode.INSERT_RIGHT
+                        ):
+                            tile_grid = tile_grid.insert(
+                                anchor_handle=selected_tile.handle,
+                                new_tile_handle=generate_handle(),
+                                direction={
+                                    Mode.INSERT_UP: CardinalDirection.UP,
+                                    Mode.INSERT_DOWN: CardinalDirection.DOWN,
+                                    Mode.INSERT_LEFT: CardinalDirection.LEFT,
+                                    Mode.INSERT_RIGHT: CardinalDirection.RIGHT,
+                                }[mode],
+                            )
 
         # }}} Controls
+
+        if mode_next != mode:
+            mode = mode_next
+            print(f"Mode: {mode.value}")
 
         # Logic {{{
         tiles_translated = [

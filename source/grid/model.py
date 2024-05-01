@@ -186,7 +186,6 @@ class Tile:
             for y in range(tile.c1.y, tile.c2.y + 1):
                 yield Cell(x=x, y=y)
 
-    @deprecated("I probably don't need it")
     def contains_cell(self, cell: Cell) -> bool:
         return cell in self.cells()
 
@@ -394,6 +393,12 @@ class TileGrid:
             x.rotate_counterclockwise() for x in self.get_tiles()
         )
 
+    def delete_by_handle(self, handle: int) -> "TileGrid":
+        return TileGrid(
+            origin=self.origin,
+            other=tuple(x for x in self.other if x.handle != handle),
+        )
+
     def compact(self) -> "TileGrid":
         current_grid = self
 
@@ -583,11 +588,11 @@ class TileGrid:
             case CardinalDirection.RIGHT:
                 pass
             case CardinalDirection.DOWN:
-                current_grid = self.rotate_clockwise()
+                current_grid = current_grid.rotate_clockwise()
             case CardinalDirection.UP:
-                current_grid = self.rotate_counterclockwise()
+                current_grid = current_grid.rotate_counterclockwise()
             case CardinalDirection.LEFT:
-                current_grid = self.rotate_clockwise().rotate_clockwise()
+                current_grid = current_grid.rotate_clockwise().rotate_clockwise()
         # }}}
 
         return current_grid
