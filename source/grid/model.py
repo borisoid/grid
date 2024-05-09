@@ -597,6 +597,67 @@ class TileGrid:
 
         return current_grid
 
+    def split_tile(
+        self, *, tile_handle: int, direction: CardinalDirection, new_tile_handle: int
+    ) -> "TileGrid":
+        # Guard {{{
+        tile = self.get_tile_by_handle(tile_handle)
+        if tile is None:
+            return self
+        # }}}
+
+        # Prepare. Rotate grid so that insert to the RIGHT needs to be done {{{
+        match direction:
+            case CardinalDirection.RIGHT:
+                current_grid = self
+            case CardinalDirection.DOWN:
+                current_grid = self.rotate_counterclockwise()
+            case CardinalDirection.UP:
+                current_grid = self.rotate_clockwise()
+            case CardinalDirection.LEFT:
+                current_grid = self.rotate_counterclockwise().rotate_counterclockwise()
+        # }}}
+
+        new_tiles: list[Tile] = []
+        for tile in current_grid.get_tiles():
+            corners = tile.as_corners()
+            width = corners.c2.x - corners.c1.x
+
+            if (tile.handle != tile_handle) or (width < 2):
+                new_tiles.append(tile)
+                continue
+
+            c2 = Cell(x=corners.c1.x + (width // 2), y=corners.c2.y)
+            c1 = Cell(x=c2.x + 1, y=corners.c1.y)
+
+            new_tiles.extend(
+                (
+                    tile.keep_handle(
+                        TileAsCorners(c1=corners.c1, c2=c2),
+                    ),
+                    Tile.build(
+                        TileAsCorners(c1=c1, c2=corners.c2),
+                        handle=new_tile_handle,
+                    ),
+                )
+            )
+
+        current_grid = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+
+        # Rotate back to original orientation {{{
+        match direction:
+            case CardinalDirection.RIGHT:
+                pass
+            case CardinalDirection.DOWN:
+                current_grid = current_grid.rotate_clockwise()
+            case CardinalDirection.UP:
+                current_grid = current_grid.rotate_counterclockwise()
+            case CardinalDirection.LEFT:
+                current_grid = current_grid.rotate_clockwise().rotate_clockwise()
+        # }}}
+
+        return current_grid
+
 
 # Line {{{
 
