@@ -11,16 +11,16 @@ from .model import CardinalDirection, Cell, Tile, TileAsCorners, TileGrid, get_b
 FPS = 24
 
 WINDOW_WIDTH = 1000
-WINDOW_HEIGHT = 800
+WINDOW_HEIGHT = 1000
 
-CELL_SIDE_LENGTH = 80  # 35
+CELL_SIDE_LENGTH = 5  # 35
 
 CELLS_X = WINDOW_WIDTH // CELL_SIDE_LENGTH
 CELLS_Y = WINDOW_HEIGHT // CELL_SIDE_LENGTH
 
-GRID_LINE_WIDTH = 5
-GRID_LINE_WIDTH_BOLD = 7
-CELL_PADDING = 18
+GRID_LINE_WIDTH = 1
+GRID_LINE_WIDTH_BOLD = 2
+CELL_PADDING = 1
 
 # Colors {{{
 BLACK = pg.Color(0, 0, 0)
@@ -187,10 +187,10 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
                 surface=screen,
                 color=YELLOW,
                 rect=pg.Rect(
-                    (tile_as_span.cell.x * CELL_SIDE_LENGTH) + (CELL_PADDING * 2),
-                    (tile_as_span.cell.y * CELL_SIDE_LENGTH) + (CELL_PADDING * 2),
-                    ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH) - (4 * CELL_PADDING),
-                    ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH) - (4 * CELL_PADDING),
+                    (tile_as_span.cell.x * CELL_SIDE_LENGTH) + ((tile_as_span.span.x // 3) * CELL_SIDE_LENGTH),
+                    (tile_as_span.cell.y * CELL_SIDE_LENGTH) + ((tile_as_span.span.y // 3) * CELL_SIDE_LENGTH),
+                    ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH) - ((tile_as_span.span.x // 3) * 2 * CELL_SIDE_LENGTH),
+                    ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH) - ((tile_as_span.span.y // 3) * 2 * CELL_SIDE_LENGTH),
                 ),
             )
 
@@ -220,6 +220,11 @@ class Mode(Enum):
     INSERT_LEFT = "INSERT_LEFT"
     INSERT_RIGHT = "INSERT_RIGHT"
 
+    SPLIT_UP = "SPLIT_UP"
+    SPLIT_DOWN = "SPLIT_DOWN"
+    SPLIT_LEFT = "SPLIT_LEFT"
+    SPLIT_RIGHT = "SPLIT_RIGHT"
+
 
 def start() -> None:
     # for _ in range(2):
@@ -228,50 +233,63 @@ def start() -> None:
 
     # print(list(box_iter(get_box_corners(TILES).normalize())))
 
+    # ORIGINAL_TILE_GRID = tile_grid = TileGrid(
+    #     origin=Tile.build(
+    #         TileAsCorners(
+    #             c1=Cell(x=0, y=-1),
+    #             c2=Cell(x=0, y=-2),
+    #         ),
+    #         handle=ORIGIN_HANDLE,
+    #     ),
+    #     other=(
+    #         Tile.build(
+    #             TileAsCorners(
+    #                 c1=Cell(x=0, y=1),
+    #                 c2=Cell(x=1, y=1),
+    #             ),
+    #             handle=generate_handle(),
+    #         ),
+    #         Tile.build(
+    #             TileAsCorners(
+    #                 c1=Cell(x=-1, y=0),
+    #                 c2=Cell(x=-1, y=1),
+    #             ),
+    #             handle=generate_handle(),
+    #         ),
+    #         Tile.build(
+    #             TileAsCorners(
+    #                 c1=Cell(x=1, y=-1),
+    #                 c2=Cell(x=1, y=-1),
+    #             ),
+    #             handle=generate_handle(),
+    #         ),
+    #         Tile.build(
+    #             TileAsCorners(
+    #                 c1=Cell(x=0, y=0),
+    #                 c2=Cell(x=1, y=0),
+    #             ),
+    #             handle=generate_handle(),
+    #         ),
+    #         Tile.build(
+    #             TileAsCorners(
+    #                 c1=Cell(x=-1, y=-1),
+    #                 c2=Cell(x=-1, y=-1),
+    #             ),
+    #             handle=generate_handle(),
+    #         ),
+    #     ),
+    # )
+
     ORIGINAL_TILE_GRID = tile_grid = TileGrid(
         origin=Tile.build(
             TileAsCorners(
-                c1=Cell(x=0, y=-1),
-                c2=Cell(x=0, y=-2),
+                c1=Cell(x=0, y=0),
+                c2=Cell(x=50, y=50),
             ),
             handle=ORIGIN_HANDLE,
         ),
         other=(
-            Tile.build(
-                TileAsCorners(
-                    c1=Cell(x=0, y=1),
-                    c2=Cell(x=1, y=1),
-                ),
-                handle=generate_handle(),
-            ),
-            Tile.build(
-                TileAsCorners(
-                    c1=Cell(x=-1, y=0),
-                    c2=Cell(x=-1, y=1),
-                ),
-                handle=generate_handle(),
-            ),
-            Tile.build(
-                TileAsCorners(
-                    c1=Cell(x=1, y=-1),
-                    c2=Cell(x=1, y=-1),
-                ),
-                handle=generate_handle(),
-            ),
-            Tile.build(
-                TileAsCorners(
-                    c1=Cell(x=0, y=0),
-                    c2=Cell(x=1, y=0),
-                ),
-                handle=generate_handle(),
-            ),
-            Tile.build(
-                TileAsCorners(
-                    c1=Cell(x=-1, y=-1),
-                    c2=Cell(x=-1, y=-1),
-                ),
-                handle=generate_handle(),
-            ),
+            
         ),
     )
 
@@ -295,13 +313,13 @@ def start() -> None:
                         mode_next = Mode.DELETE
 
                     case pg.K_h:
-                        mode_next = Mode.INSERT_LEFT
+                        mode_next = Mode.SPLIT_LEFT
                     case pg.K_j:
-                        mode_next = Mode.INSERT_DOWN
+                        mode_next = Mode.SPLIT_DOWN
                     case pg.K_k:
-                        mode_next = Mode.INSERT_UP
+                        mode_next = Mode.SPLIT_UP
                     case pg.K_l:
-                        mode_next = Mode.INSERT_RIGHT
+                        mode_next = Mode.SPLIT_RIGHT
 
                     case pg.K_0:
                         tile_grid = tile_grid.compact().centralize_origin()
@@ -350,19 +368,20 @@ def start() -> None:
                             tile_grid = tile_grid.delete_by_handle(selected_tile.handle)
 
                         case (
-                            Mode.INSERT_UP
-                            | Mode.INSERT_DOWN
-                            | Mode.INSERT_LEFT
-                            | Mode.INSERT_RIGHT
+                            Mode.SPLIT_UP
+                            | Mode.SPLIT_DOWN
+                            | Mode.SPLIT_LEFT
+                            | Mode.SPLIT_RIGHT
                         ):
-                            tile_grid = tile_grid.insert(
-                                anchor_handle=selected_tile.handle,
+                            tile_grid = tile_grid.split_tile(
+                                tile_handle=selected_tile.handle,
                                 new_tile_handle=generate_handle(),
+                                divisor=1.5,
                                 direction={
-                                    Mode.INSERT_UP: CardinalDirection.UP,
-                                    Mode.INSERT_DOWN: CardinalDirection.DOWN,
-                                    Mode.INSERT_LEFT: CardinalDirection.LEFT,
-                                    Mode.INSERT_RIGHT: CardinalDirection.RIGHT,
+                                    Mode.SPLIT_UP: CardinalDirection.UP,
+                                    Mode.SPLIT_DOWN: CardinalDirection.DOWN,
+                                    Mode.SPLIT_LEFT: CardinalDirection.LEFT,
+                                    Mode.SPLIT_RIGHT: CardinalDirection.RIGHT,
                                 }[mode],
                             )
 

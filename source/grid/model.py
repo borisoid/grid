@@ -598,9 +598,17 @@ class TileGrid:
         return current_grid
 
     def split_tile(
-        self, *, tile_handle: int, direction: CardinalDirection, new_tile_handle: int
+        self,
+        *,
+        tile_handle: int,
+        direction: CardinalDirection,
+        new_tile_handle: int,
+        divisor: float = 2,
     ) -> "TileGrid":
-        # Guard {{{
+        # Guards {{{
+        if not (divisor > 1):
+            return self
+
         tile = self.get_tile_by_handle(tile_handle)
         if tile is None:
             return self
@@ -623,11 +631,11 @@ class TileGrid:
             corners = tile.as_corners()
             width = corners.c2.x - corners.c1.x
 
-            if (tile.handle != tile_handle) or (width < 2):
+            if (tile.handle != tile_handle) or (width < divisor):
                 new_tiles.append(tile)
                 continue
 
-            c2 = Cell(x=corners.c1.x + (width // 2), y=corners.c2.y)
+            c2 = Cell(x=corners.c1.x + int(width // divisor), y=corners.c2.y)
             c1 = Cell(x=c2.x + 1, y=corners.c1.y)
 
             new_tiles.extend(
