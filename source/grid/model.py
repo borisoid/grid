@@ -329,6 +329,24 @@ class Tile:
             )
         )
 
+    def translate(self, *, delta: Cell) -> "Tile":
+        return self.keep_handle(
+            TileAsCorners(
+                c1=self.as_corners().c1 + delta,
+                c2=self.as_corners().c2 + delta,
+            )
+        )
+
+    def scale_horizontally(self, factor: float) -> "Tile":
+        corners = self.as_corners()
+
+        return self.keep_handle(
+            TileAsCorners(
+                c1=Cell(x=int(corners.c1.x * factor), y=corners.c1.y),
+                c2=Cell(x=int(corners.c2.x * factor), y=corners.c2.y),
+            )
+        )
+
 
 def get_box(tiles: Iterable[Tile]) -> Tile:
     tiles = tuple(tiles)
@@ -356,19 +374,7 @@ class TileGrid:
         return get_box(self.get_tiles())
 
     def centralize_origin(self) -> "TileGrid":
-        delta_cell = Cell(x=0, y=0) - self.origin.as_corners().c1
-
-        tiles = tuple(
-            tile.keep_handle(
-                TileAsCorners(
-                    c1=tile.as_corners().c1 + delta_cell,
-                    c2=tile.as_corners().c2 + delta_cell,
-                )
-            )
-            for tile in self.get_tiles()
-        )
-
-        return TileGrid(origin=tiles[0], other=tiles[1:])
+        return self.translate(delta=Cell(x=0, y=0) - self.origin.as_corners().c1)
 
     def get_uncovered_cells(self) -> set[Cell]:
         tiles = self.get_tiles()
@@ -603,12 +609,8 @@ class TileGrid:
         tile_handle: int,
         direction: CardinalDirection,
         new_tile_handle: int,
-        divisor: float = 2,
     ) -> "TileGrid":
         # Guards {{{
-        if not (divisor > 1):
-            return self
-
         tile = self.get_tile_by_handle(tile_handle)
         if tile is None:
             return self
@@ -631,11 +633,11 @@ class TileGrid:
             corners = tile.as_corners()
             width = corners.c2.x - corners.c1.x
 
-            if (tile.handle != tile_handle) or (width < divisor):
+            if (tile.handle != tile_handle) or (width < 2):
                 new_tiles.append(tile)
                 continue
 
-            c2 = Cell(x=corners.c1.x + int(width // divisor), y=corners.c2.y)
+            c2 = Cell(x=corners.c1.x + (width // 2), y=corners.c2.y)
             c1 = Cell(x=c2.x + 1, y=corners.c1.y)
 
             new_tiles.extend(
@@ -665,6 +667,28 @@ class TileGrid:
         # }}}
 
         return current_grid
+
+    def translate(self, *, delta: Cell) -> "TileGrid":
+        return TileGrid.from_tiles(
+            tuple(tile.translate(delta=delta) for tile in self.get_tiles())
+        )
+
+    def scale(self, *, horizontal: float, vertical: float) -> "TileGrid":
+        current = self
+        current = current.translate(
+            delta=self.get_box().as_corners().c1 - Cell(x=1, y=1)
+        )
+        current = current._scale_horizontally(factor=horizontal)
+        current = current.rotate_clockwise()
+        current = current._scale_horizontally(factor=vertical)
+        current = current.rotate_counterclockwise()
+        current = current.centralize_origin()
+        return current
+
+    def _scale_horizontally(self, *, factor: float) -> "TileGrid":
+        return TileGrid.from_tiles(
+            tile.scale_horizontally(factor) for tile in self.get_tiles()
+        )
 
 
 # Line {{{

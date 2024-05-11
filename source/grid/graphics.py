@@ -332,6 +332,9 @@ def start() -> None:
                     case pg.K_e:
                         tile_grid = tile_grid.expand().centralize_origin()
 
+                    case pg.K_s:
+                        tile_grid = tile_grid.scale(horizontal=1.01, vertical=1.01)
+
                     case pg.K_r:
                         tile_grid = ORIGINAL_TILE_GRID
 
@@ -376,7 +379,6 @@ def start() -> None:
                             tile_grid = tile_grid.split_tile(
                                 tile_handle=selected_tile.handle,
                                 new_tile_handle=generate_handle(),
-                                divisor=1.5,
                                 direction={
                                     Mode.SPLIT_UP: CardinalDirection.UP,
                                     Mode.SPLIT_DOWN: CardinalDirection.DOWN,
