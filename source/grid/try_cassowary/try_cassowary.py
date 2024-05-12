@@ -33,11 +33,11 @@ print(x1, x2, x3, x4, width)
 
 solver = SimplexSolver()
 
-x1 = Variable("x1", 267)
-x2 = Variable("x2", 533)
-x3 = Variable("x3", 267)
-x4 = Variable("x4", 266)
-x5 = Variable("x5", 534)
+x1 = Variable("x1")
+x2 = Variable("x2")
+x3 = Variable("x3")
+x4 = Variable("x4")
+x5 = Variable("x5")
 xs = (x1, x2, x3, x4, x5)
 
 width = 800
