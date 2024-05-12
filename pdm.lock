@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:1c9723d5503a8edeace59a955e7c63053d9713129b6f48049cba946afad31fab"
+content_hash = "sha256:26b671a82c9b670f53c0118fbe4af04c33900e40a1ff04a95874e9e36ef02898"
 
 [[package]]
 name = "black"
@@ -27,6 +27,16 @@ files = [
     {file = "black-24.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:56f52cfbd3dabe2798d76dbdd299faa046a901041faf2cf33288bc4e6dae57b5"},
     {file = "black-24.3.0-py3-none-any.whl", hash = "sha256:41622020d7120e01d377f74249e677039d20e6344ff5851de8a10f11f513bf93"},
     {file = "black-24.3.0.tar.gz", hash = "sha256:a0c9c4a0771afc6919578cec71ce82a3e31e054904e7197deacbc9382671c41f"},
+]
+
+[[package]]
+name = "cassowary"
+version = "0.5.2"
+summary = "A pure Python implementation of the Cassowary constraint solving algorithm."
+groups = ["default"]
+files = [
+    {file = "cassowary-0.5.2-py2.py3-none-any.whl", hash = "sha256:5da16ceca5fd42c848d3a875f3834a7b93f2cc74dd07039ea7e5305c0fbb926d"},
+    {file = "cassowary-0.5.2.tar.gz", hash = "sha256:d7c0d10722738eca3cd939c8f6f1a580fdfa4fad71b71d0d193c10aaa3d406dd"},
 ]
 
 [[package]]
