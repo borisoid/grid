@@ -5,7 +5,15 @@ from typing import Generator, Iterable
 
 import pygame as pg
 
-from .model import CardinalDirection, Cell, Tile, TileAsCorners, TileGrid, get_box
+from .model import (
+    CardinalDirection,
+    Cell,
+    IntHandle,
+    Tile,
+    TileAsCorners,
+    TileGrid,
+    get_box,
+)
 
 
 FPS = 24
@@ -13,7 +21,7 @@ FPS = 24
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 1000
 
-CELL_SIDE_LENGTH = 5  # 35
+CELL_SIDE_LENGTH = 20  # 35
 
 CELLS_X = WINDOW_WIDTH // CELL_SIDE_LENGTH
 CELLS_Y = WINDOW_HEIGHT // CELL_SIDE_LENGTH
@@ -63,7 +71,7 @@ for i, color in zip(range(20), itertools.cycle((RED, GREEN_170, BLUE_150))):
     tile_colors.append(color)
 
 
-def handle_generator() -> Generator[int, None, None]:
+def handle_generator() -> Generator[IntHandle, None, None]:
     handle = 0
     while True:
         yield handle
@@ -73,7 +81,7 @@ def handle_generator() -> Generator[int, None, None]:
 HANDLE_GENERATOR = handle_generator()
 
 
-def generate_handle() -> int:
+def generate_handle() -> IntHandle:
     return next(HANDLE_GENERATOR)
 
 
@@ -187,10 +195,22 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
                 surface=screen,
                 color=YELLOW,
                 rect=pg.Rect(
-                    (tile_as_span.cell.x * CELL_SIDE_LENGTH) + ((tile_as_span.span.x // 3) * CELL_SIDE_LENGTH),
-                    (tile_as_span.cell.y * CELL_SIDE_LENGTH) + ((tile_as_span.span.y // 3) * CELL_SIDE_LENGTH),
-                    ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH) - ((tile_as_span.span.x // 3) * 2 * CELL_SIDE_LENGTH),
-                    ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH) - ((tile_as_span.span.y // 3) * 2 * CELL_SIDE_LENGTH),
+                    (
+                        (tile_as_span.cell.x * CELL_SIDE_LENGTH)
+                        + ((tile_as_span.span.x // 3) * CELL_SIDE_LENGTH)
+                    ),
+                    (
+                        (tile_as_span.cell.y * CELL_SIDE_LENGTH)
+                        + ((tile_as_span.span.y // 3) * CELL_SIDE_LENGTH)
+                    ),
+                    (
+                        ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH)
+                        - ((tile_as_span.span.x // 3) * 2 * CELL_SIDE_LENGTH)
+                    ),
+                    (
+                        ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH)
+                        - ((tile_as_span.span.y // 3) * 2 * CELL_SIDE_LENGTH)
+                    ),
                 ),
             )
 
@@ -284,13 +304,11 @@ def start() -> None:
         origin=Tile.build(
             TileAsCorners(
                 c1=Cell(x=0, y=0),
-                c2=Cell(x=50, y=50),
+                c2=Cell(x=20, y=20),
             ),
             handle=ORIGIN_HANDLE,
         ),
-        other=(
-            
-        ),
+        other=(),
     )
 
     mode = Mode.NORMAL
@@ -333,7 +351,8 @@ def start() -> None:
                         tile_grid = tile_grid.expand().centralize_origin()
 
                     case pg.K_s:
-                        tile_grid = tile_grid.scale(horizontal=1.01, vertical=1.01)
+                        # tile_grid = tile_grid.resize(new_boundary=Cell(x=10, y=10))
+                        tile_grid = tile_grid.resize_along_x(new_x_length=10)
 
                     case pg.K_r:
                         tile_grid = ORIGINAL_TILE_GRID
@@ -363,7 +382,7 @@ def start() -> None:
                         selected_tile = tile_translated
                         break
 
-                if (selected_tile is not None) and (selected_tile.handle is not None):
+                if selected_tile is not None:
                     match mode:
                         case Mode.NORMAL:
                             pass

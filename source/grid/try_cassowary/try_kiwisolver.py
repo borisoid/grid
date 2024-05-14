@@ -18,7 +18,13 @@ width = 800
 for x in xs:
     solver.addConstraint(x >= 1)
     solver.addConstraint(x <= (width - 1))
-    solver.addConstraint(x >= (width // 3))
+    # solver.addConstraint(x >= (width // 3))
+
+solver.addConstraint(x1 >= (width // 4 * 2) - 1)
+solver.addConstraint(x2 >= (width // 4 * 2) - 1)
+solver.addConstraint(x3 >= (width // 4) - 1)
+solver.addConstraint(x4 >= (width // 4) - 1)
+solver.addConstraint(x5 >= (width // 4 * 2) - 1)
 
 solver.addConstraint(x1 + x2 == width)
 solver.addConstraint(x1 + x3 + x4 == width)

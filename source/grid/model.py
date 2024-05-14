@@ -10,10 +10,12 @@ Coordinates:
 import dataclasses
 import functools
 import itertools
+from collections import Counter, defaultdict
 from enum import Enum, auto
 from types import MappingProxyType
 from typing import Generator, Iterable, NewType, Sequence
 
+from kiwisolver import Solver, Variable
 from typing_extensions import deprecated
 
 
@@ -136,15 +138,16 @@ assert delta.y >= 0
 """
 
 
+type IntHandle = int
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Tile:
     tile: TileAsCornersNormalized
-    handle: int | None = None
+    handle: IntHandle
 
     @staticmethod
-    def build(
-        arg: TileAsCorners | TileAsSpan, /, *, handle: int | None = None
-    ) -> "Tile":
+    def build(arg: TileAsCorners | TileAsSpan, /, *, handle: IntHandle = -1) -> "Tile":
         if isinstance(arg, TileAsSpan):
             return Tile(tile=arg.as_corners(), handle=handle)
 
@@ -337,16 +340,6 @@ class Tile:
             )
         )
 
-    def scale_horizontally(self, factor: float) -> "Tile":
-        corners = self.as_corners()
-
-        return self.keep_handle(
-            TileAsCorners(
-                c1=Cell(x=int(corners.c1.x * factor), y=corners.c1.y),
-                c2=Cell(x=int(corners.c2.x * factor), y=corners.c2.y),
-            )
-        )
-
 
 def get_box(tiles: Iterable[Tile]) -> Tile:
     tiles = tuple(tiles)
@@ -385,11 +378,25 @@ class TileGrid:
 
         return box_cells - tiles_cells
 
-    def get_tile_by_handle(self, handle: int) -> Tile | None:
+    def get_tile_by_handle(self, handle: IntHandle) -> Tile | None:
         for tile in self.get_tiles():
             if tile.handle == handle:
                 return tile
         return None
+
+    def count_handles(self) -> Counter[IntHandle]:
+        return Counter(t.handle for t in self.get_tiles())
+
+    def get_handle_errors(self) -> dict[IntHandle, int]:
+        return {
+            handle: count
+            for handle, count in self.count_handles().items()
+            if count != 1
+        }
+
+    def raise_if_handle_error(self) -> None:
+        if errors := self.get_handle_errors():
+            raise Exception(str(errors))
 
     def rotate_clockwise(self) -> "TileGrid":
         return TileGrid.from_tiles(x.rotate_clockwise() for x in self.get_tiles())
@@ -399,7 +406,7 @@ class TileGrid:
             x.rotate_counterclockwise() for x in self.get_tiles()
         )
 
-    def delete_by_handle(self, handle: int) -> "TileGrid":
+    def delete_by_handle(self, handle: IntHandle) -> "TileGrid":
         return TileGrid(
             origin=self.origin,
             other=tuple(x for x in self.other if x.handle != handle),
@@ -414,15 +421,15 @@ class TileGrid:
             sorted(box.shred_horizontally(), key=lambda l: l.coordinate, reverse=True),
             sorted(box.shred_vertically(), key=lambda l: l.coordinate, reverse=True),
         ):
-            # {{{ Prevent "shear line" problem. I.e. when
-            # 112 -> 12
-            # 344    34
-            if {
-                TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE,
-                TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE,
-            }.issubset(t.relation_to_line(line) for t in current_grid.get_tiles()):
-                continue
-            # }}}
+            # # {{{ Prevent "shear line" problem. I.e. when
+            # # 112 -> 12
+            # # 344    34
+            # if {
+            #     TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE,
+            #     TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE,
+            # }.issubset(t.relation_to_line(line) for t in current_grid.get_tiles()):
+            #     continue
+            # # }}}
 
             delta = {
                 Orientation.HORIZONTAL: Cell(x=0, y=-1),
@@ -512,7 +519,11 @@ class TileGrid:
         return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
     def insert(
-        self, *, anchor_handle: int, direction: CardinalDirection, new_tile_handle: int
+        self,
+        *,
+        anchor_handle: IntHandle,
+        direction: CardinalDirection,
+        new_tile_handle: IntHandle,
     ) -> "TileGrid":
         # Guard {{{
         anchor_tile = self.get_tile_by_handle(anchor_handle)
@@ -606,9 +617,9 @@ class TileGrid:
     def split_tile(
         self,
         *,
-        tile_handle: int,
+        tile_handle: IntHandle,
         direction: CardinalDirection,
-        new_tile_handle: int,
+        new_tile_handle: IntHandle,
     ) -> "TileGrid":
         # Guards {{{
         tile = self.get_tile_by_handle(tile_handle)
@@ -673,21 +684,122 @@ class TileGrid:
             tuple(tile.translate(delta=delta) for tile in self.get_tiles())
         )
 
-    def scale(self, *, horizontal: float, vertical: float) -> "TileGrid":
-        current = self
-        current = current.translate(
-            delta=self.get_box().as_corners().c1 - Cell(x=1, y=1)
+    def resize(self, *, new_boundary: Cell) -> "TileGrid":
+        return (
+            self.resize_along_x(new_x_length=new_boundary.x)
+            .rotate_clockwise()
+            .resize_along_x(new_x_length=new_boundary.y)
+            .rotate_counterclockwise()
         )
-        current = current._scale_horizontally(factor=horizontal)
-        current = current.rotate_clockwise()
-        current = current._scale_horizontally(factor=vertical)
-        current = current.rotate_counterclockwise()
-        current = current.centralize_origin()
-        return current
 
-    def _scale_horizontally(self, *, factor: float) -> "TileGrid":
+    def resize_along_x(self, *, new_x_length: int) -> "TileGrid":
+
+        @dataclasses.dataclass(frozen=True, slots=True)
+        class CellVar:
+            cell: Variable
+            span: Variable
+
+        self.raise_if_handle_error()
+        tiles_sorted = tuple(
+            sorted(self.get_tiles(), key=lambda tile: tile.as_corners().c1.x)
+        )
+
+        # Lines {{{
+        tiles_on_line: defaultdict[int, list[IntHandle]] = defaultdict(list)
+        for y in self.get_ys():
+            for tile in tiles_sorted:
+                match tile.relation_to_line(
+                    Line(coordinate=y, orientation=Orientation.HORIZONTAL)
+                ):
+                    case (
+                        TileRelationToLine.HAVE_COMMON_CELLS
+                        | TileRelationToLine.FULLY_CONTAINED
+                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
+                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
+                    ):
+                        tiles_on_line[y].append(tile.handle)
+                    case _:
+                        pass
+        # }}}
+
+        # Variable declaration {{{
+        zero = Variable("ZERO")
+        cell_vars: dict[IntHandle, CellVar] = {
+            tile.handle: CellVar(
+                cell=Variable(f"cell.x.{tile.handle}"),
+                span=Variable(f"span.x.{tile.handle}"),
+            )
+            for tile in tiles_sorted
+        }
+        # }}}
+
+        solver = Solver()
+        solver.addConstraint(zero == 0)
+
+        for cell_var in cell_vars.values():
+            solver.addConstraint(cell_var.span >= 0)
+            solver.addConstraint(cell_var.span <= new_x_length)
+
+            # TODO: scaling
+
+            # Balancing {{{
+            solver.addConstraint(
+                (cell_var.span + 1)
+                >= (
+                    new_x_length
+                    // max(len(handles) for handles in tiles_on_line.values())
+                )
+            )
+            # }}}
+
+        # Position constraints {{{
+        for handles in tiles_on_line.values():
+            # Span constraints {{{
+            expression = functools.reduce(
+                lambda a, b: a + b,
+                (cell_vars[handle].span + 1 for handle in handles),
+                zero,
+            )
+            solver.addConstraint(expression == new_x_length)
+            # }}}
+
+            # Cell constraints {{{
+            for i in range(1, len(handles)):
+                previous_handle, handle = handles[i - 1], handles[i]
+                solver.addConstraint(
+                    cell_vars[handle].cell
+                    == (
+                        cell_vars[previous_handle].cell
+                        + cell_vars[previous_handle].span
+                        + 1
+                    )
+                )
+            # }}}
+
+        # }}}
+
+        solver.updateVariables()
         return TileGrid.from_tiles(
-            tile.scale_horizontally(factor) for tile in self.get_tiles()
+            tile.keep_handle(
+                TileAsSpan(
+                    cell=Cell(
+                        x=int(cell_vars[tile.handle].cell.value()),
+                        y=tile.as_span().cell.y,
+                    ),
+                    span=Cell(
+                        x=int(cell_vars[tile.handle].span.value()),
+                        y=tile.as_span().span.y,
+                    ),
+                )
+            )
+            for tile in self.get_tiles()
+        )
+
+    def get_ys(self) -> set[int]:
+        return set(
+            itertools.chain(
+                *((t.c1.y, t.c2.y) for t in (t.as_corners() for t in self.get_tiles()))
+            )
         )
 
 
