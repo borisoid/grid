@@ -694,18 +694,37 @@ class TileGrid:
 
     def resize_along_x(self, *, new_x_length: int) -> "TileGrid":
 
+        self.raise_if_handle_error()
+
         @dataclasses.dataclass(frozen=True, slots=True)
         class TileVar:
-            cell: Variable
-            span: Variable
+            cell_x: Variable
+            span_x: Variable
 
-        self.raise_if_handle_error()
+            cell_y: int
+            span_y: int
+
+            handle: IntHandle
+
         tiles_sorted = tuple(
             sorted(self.get_tiles(), key=lambda tile: tile.as_corners().c1.x)
         )
 
+        # Variable declaration {{{
+        tile_vars: dict[IntHandle, TileVar] = {
+            tile.handle: TileVar(
+                cell_x=Variable(f"cell.x.{tile.handle}"),
+                span_x=Variable(f"span.x.{tile.handle}"),
+                cell_y=tile.as_span().cell.y,
+                span_y=tile.as_span().span.y,
+                handle=tile.handle,
+            )
+            for tile in tiles_sorted
+        }
+        # }}}
+
         # Lines {{{
-        tiles_on_line: defaultdict[int, list[IntHandle]] = defaultdict(list)
+        tile_vars_groups: defaultdict[int, list[TileVar]] = defaultdict(list)
         for y in self.get_ys():
             for tile in tiles_sorted:
                 match tile.relation_to_line(
@@ -717,41 +736,27 @@ class TileGrid:
                         | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
                         | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
                     ):
-                        tiles_on_line[y].append(tile.handle)
+                        tile_vars_groups[y].append(tile_vars[tile.handle])
                     case _:
                         pass
-        # }}}
 
-        # Variable declaration {{{
-        tile_vars: dict[IntHandle, TileVar] = {
-            tile.handle: TileVar(
-                cell=Variable(f"cell.x.{tile.handle}"),
-                span=Variable(f"span.x.{tile.handle}"),
-            )
-            for tile in tiles_sorted
-        }
+        max_tiles = max(len(tiles) for tiles in tile_vars_groups.values())
         # }}}
 
         solver = Solver()
 
         for tile_var in tile_vars.values():
-            solver.addConstraint(tile_var.span >= 0)
-            solver.addConstraint(tile_var.span <= new_x_length)
+            solver.addConstraint(tile_var.span_x >= 0)
+            solver.addConstraint(tile_var.span_x <= new_x_length)
 
             # TODO: scaling
 
             # Balancing {{{
-            solver.addConstraint(
-                (tile_var.span + 1)
-                >= (
-                    new_x_length
-                    // max(len(handles) for handles in tiles_on_line.values())
-                )
-            )
+            solver.addConstraint((tile_var.span_x + 1) >= (new_x_length // max_tiles))
             # }}}
 
         # Position constraints {{{
-        for handles in tiles_on_line.values():
+        for tile_vars_group in tile_vars_groups.values():
             # Span constraints {{{
             def reducer(
                 a: Variable | Expression, b: Variable | Expression
@@ -759,25 +764,20 @@ class TileGrid:
                 return a + b
 
             expression = functools.reduce(
-                reducer, (tile_vars[handle].span + 1 for handle in handles)
+                reducer, (tile_vars.span_x + 1 for tile_vars in tile_vars_group)
             )
             solver.addConstraint(expression == new_x_length)
             # }}}
 
             # Cell constraints {{{
-            if len(handles) > 0:
+            if len(tile_vars_group) > 0:
                 # Don't let rows of tiles slide out of the box
-                solver.addConstraint(tile_vars[handles[0]].cell == 0)
+                solver.addConstraint(tile_vars_group[0].cell_x == 0)
 
-            for i in range(1, len(handles)):
-                previous_handle, handle = handles[i - 1], handles[i]
+            for i in range(1, len(tile_vars_group)):
+                previous_tile, tile = tile_vars_group[i - 1], tile_vars_group[i]
                 solver.addConstraint(
-                    tile_vars[handle].cell
-                    == (
-                        tile_vars[previous_handle].cell
-                        + tile_vars[previous_handle].span
-                        + 1
-                    )
+                    tile.cell_x == (previous_tile.cell_x + previous_tile.span_x + 1)
                 )
             # }}}
 
@@ -785,19 +785,20 @@ class TileGrid:
 
         solver.updateVariables()
         return TileGrid.from_tiles(
-            tile.keep_handle(
+            Tile.build(
                 TileAsSpan(
                     cell=Cell(
-                        x=int(tile_vars[tile.handle].cell.value()),
-                        y=tile.as_span().cell.y,
+                        x=int(tile_var.cell_x.value()),
+                        y=tile_var.cell_y,
                     ),
                     span=Cell(
-                        x=int(tile_vars[tile.handle].span.value()),
-                        y=tile.as_span().span.y,
+                        x=int(tile_var.span_x.value()),
+                        y=tile_var.span_y,
                     ),
-                )
+                ),
+                handle=tile_var.handle,
             )
-            for tile in self.get_tiles()
+            for tile_var in (tile_vars[tile.handle] for tile in self.get_tiles())
         )
 
     def get_ys(self) -> set[int]:
