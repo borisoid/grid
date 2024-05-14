@@ -764,6 +764,10 @@ class TileGrid:
             # }}}
 
             # Cell constraints {{{
+            if len(handles) > 0:
+                # Don't let rows of tiles slide out of the box
+                solver.addConstraint(cell_vars[handles[0]].cell == 0)
+
             for i in range(1, len(handles)):
                 previous_handle, handle = handles[i - 1], handles[i]
                 solver.addConstraint(
