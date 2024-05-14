@@ -28,6 +28,7 @@ dev = [
     "pytest>=8.1.1",
     "black>=24.3.0",
     "isort>=5.13.2",
+    "pyright>=1.1.362",
 ]
 
 [tool.pytest.ini_options]

@@ -15,7 +15,7 @@ from enum import Enum, auto
 from types import MappingProxyType
 from typing import Generator, Iterable, NewType, Sequence
 
-from kiwisolver import Solver, Variable
+from kiwisolver import Expression, Solver, Variable
 from typing_extensions import deprecated
 
 
@@ -695,7 +695,7 @@ class TileGrid:
     def resize_along_x(self, *, new_x_length: int) -> "TileGrid":
 
         @dataclasses.dataclass(frozen=True, slots=True)
-        class CellVar:
+        class TileVar:
             cell: Variable
             span: Variable
 
@@ -723,9 +723,8 @@ class TileGrid:
         # }}}
 
         # Variable declaration {{{
-        zero = Variable("ZERO")
-        cell_vars: dict[IntHandle, CellVar] = {
-            tile.handle: CellVar(
+        tile_vars: dict[IntHandle, TileVar] = {
+            tile.handle: TileVar(
                 cell=Variable(f"cell.x.{tile.handle}"),
                 span=Variable(f"span.x.{tile.handle}"),
             )
@@ -734,17 +733,16 @@ class TileGrid:
         # }}}
 
         solver = Solver()
-        solver.addConstraint(zero == 0)
 
-        for cell_var in cell_vars.values():
-            solver.addConstraint(cell_var.span >= 0)
-            solver.addConstraint(cell_var.span <= new_x_length)
+        for tile_var in tile_vars.values():
+            solver.addConstraint(tile_var.span >= 0)
+            solver.addConstraint(tile_var.span <= new_x_length)
 
             # TODO: scaling
 
             # Balancing {{{
             solver.addConstraint(
-                (cell_var.span + 1)
+                (tile_var.span + 1)
                 >= (
                     new_x_length
                     // max(len(handles) for handles in tiles_on_line.values())
@@ -755,10 +753,13 @@ class TileGrid:
         # Position constraints {{{
         for handles in tiles_on_line.values():
             # Span constraints {{{
+            def reducer(
+                a: Variable | Expression, b: Variable | Expression
+            ) -> Expression:
+                return a + b
+
             expression = functools.reduce(
-                lambda a, b: a + b,
-                (cell_vars[handle].span + 1 for handle in handles),
-                zero,
+                reducer, (tile_vars[handle].span + 1 for handle in handles)
             )
             solver.addConstraint(expression == new_x_length)
             # }}}
@@ -766,15 +767,15 @@ class TileGrid:
             # Cell constraints {{{
             if len(handles) > 0:
                 # Don't let rows of tiles slide out of the box
-                solver.addConstraint(cell_vars[handles[0]].cell == 0)
+                solver.addConstraint(tile_vars[handles[0]].cell == 0)
 
             for i in range(1, len(handles)):
                 previous_handle, handle = handles[i - 1], handles[i]
                 solver.addConstraint(
-                    cell_vars[handle].cell
+                    tile_vars[handle].cell
                     == (
-                        cell_vars[previous_handle].cell
-                        + cell_vars[previous_handle].span
+                        tile_vars[previous_handle].cell
+                        + tile_vars[previous_handle].span
                         + 1
                     )
                 )
@@ -787,11 +788,11 @@ class TileGrid:
             tile.keep_handle(
                 TileAsSpan(
                     cell=Cell(
-                        x=int(cell_vars[tile.handle].cell.value()),
+                        x=int(tile_vars[tile.handle].cell.value()),
                         y=tile.as_span().cell.y,
                     ),
                     span=Cell(
-                        x=int(cell_vars[tile.handle].span.value()),
+                        x=int(tile_vars[tile.handle].span.value()),
                         y=tile.as_span().span.y,
                     ),
                 )
