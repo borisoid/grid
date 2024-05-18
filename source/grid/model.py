@@ -13,7 +13,7 @@ import itertools
 from collections import Counter, defaultdict
 from enum import Enum, auto
 from types import MappingProxyType
-from typing import Generator, Iterable, NewType, Sequence
+from typing import Generator, Iterable, Literal, NewType, Sequence
 
 from kiwisolver import Expression, Solver, Variable
 from typing_extensions import deprecated
@@ -686,13 +686,15 @@ class TileGrid:
 
     def resize(self, *, new_boundary: Cell) -> "TileGrid":
         return (
-            self.resize_along_x(new_x_length=new_boundary.x)
+            self.resize_along_x(x_length_new=new_boundary.x)
             .rotate_clockwise()
-            .resize_along_x(new_x_length=new_boundary.y)
+            .resize_along_x(x_length_new=new_boundary.y)
             .rotate_counterclockwise()
         )
 
-    def resize_along_x(self, *, new_x_length: int) -> "TileGrid":
+    def resize_along_x(
+        self, *, x_length_new: int, mode: Literal["balance", "scale"] = "scale"
+    ) -> "TileGrid":
 
         self.raise_if_handle_error()
 
@@ -747,13 +749,38 @@ class TileGrid:
 
         for tile_var in tile_vars.values():
             solver.addConstraint(tile_var.span_x >= 0)
-            solver.addConstraint(tile_var.span_x <= new_x_length)
+            solver.addConstraint(tile_var.span_x <= x_length_new)
 
-            # TODO: scaling
+            match mode:
 
-            # Balancing {{{
-            solver.addConstraint((tile_var.span_x + 1) >= (new_x_length // max_tiles))
-            # }}}
+                case "scale":
+                    # Scaling {{{
+
+                    # span_x_new   x_length_new
+                    # ---------- = ------------
+                    # span_x_old   x_length_old
+
+                    # span_x_new = (span_x_old * x_length_new) / x_length_old
+
+                    a = self.get_tile_by_handle(tile_var.handle)
+                    if a is None:
+                        raise Exception
+
+                    solver.addConstraint(
+                        (tile_var.span_x + 1)
+                        >= (
+                            ((a.as_span().span.x + 1) * x_length_new)
+                            // (self.get_box().as_span().span.x + 1)
+                        )
+                    )
+                    # }}}
+
+                case "balance":
+                    # Balancing {{{
+                    solver.addConstraint(
+                        (tile_var.span_x + 1) >= (x_length_new // max_tiles)
+                    )
+                    # }}}
 
         # Position constraints {{{
         for tile_vars_group in tile_vars_groups.values():
@@ -766,7 +793,7 @@ class TileGrid:
             expression = functools.reduce(
                 reducer, (tile_vars.span_x + 1 for tile_vars in tile_vars_group)
             )
-            solver.addConstraint(expression == new_x_length)
+            solver.addConstraint(expression == x_length_new)
             # }}}
 
             # Cell constraints {{{

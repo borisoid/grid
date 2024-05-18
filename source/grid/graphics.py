@@ -352,7 +352,7 @@ def start() -> None:
 
                     case pg.K_s:
                         # tile_grid = tile_grid.resize(new_boundary=Cell(x=10, y=10))
-                        tile_grid = tile_grid.resize_along_x(new_x_length=10)
+                        tile_grid = tile_grid.resize_along_x(x_length_new=10)
 
                     case pg.K_r:
                         tile_grid = ORIGINAL_TILE_GRID
