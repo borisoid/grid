@@ -178,15 +178,15 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
     # Tiles {{{
 
     for tile, color in zip(tiles, tile_colors):
-        tile_as_span = tile.as_span()
+        tile_as_step = tile.as_step()
         pg.draw.rect(
             surface=screen,
             color=color,
             rect=pg.Rect(
-                (tile_as_span.cell.x * CELL_SIDE_LENGTH) + CELL_PADDING,
-                (tile_as_span.cell.y * CELL_SIDE_LENGTH) + CELL_PADDING,
-                ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
-                ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
+                (tile_as_step.cell.x * CELL_SIDE_LENGTH) + CELL_PADDING,
+                (tile_as_step.cell.y * CELL_SIDE_LENGTH) + CELL_PADDING,
+                ((tile_as_step.step.x + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
+                ((tile_as_step.step.y + 1) * CELL_SIDE_LENGTH) - (2 * CELL_PADDING),
             ),
         )
 
@@ -196,20 +196,20 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
                 color=YELLOW,
                 rect=pg.Rect(
                     (
-                        (tile_as_span.cell.x * CELL_SIDE_LENGTH)
-                        + ((tile_as_span.span.x // 3) * CELL_SIDE_LENGTH)
+                        (tile_as_step.cell.x * CELL_SIDE_LENGTH)
+                        + ((tile_as_step.step.x // 3) * CELL_SIDE_LENGTH)
                     ),
                     (
-                        (tile_as_span.cell.y * CELL_SIDE_LENGTH)
-                        + ((tile_as_span.span.y // 3) * CELL_SIDE_LENGTH)
+                        (tile_as_step.cell.y * CELL_SIDE_LENGTH)
+                        + ((tile_as_step.step.y // 3) * CELL_SIDE_LENGTH)
                     ),
                     (
-                        ((tile_as_span.span.x + 1) * CELL_SIDE_LENGTH)
-                        - ((tile_as_span.span.x // 3) * 2 * CELL_SIDE_LENGTH)
+                        ((tile_as_step.step.x + 1) * CELL_SIDE_LENGTH)
+                        - ((tile_as_step.step.x // 3) * 2 * CELL_SIDE_LENGTH)
                     ),
                     (
-                        ((tile_as_span.span.y + 1) * CELL_SIDE_LENGTH)
-                        - ((tile_as_span.span.y // 3) * 2 * CELL_SIDE_LENGTH)
+                        ((tile_as_step.step.y + 1) * CELL_SIDE_LENGTH)
+                        - ((tile_as_step.step.y // 3) * 2 * CELL_SIDE_LENGTH)
                     ),
                 ),
             )

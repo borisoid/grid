@@ -1,4 +1,4 @@
-from source.grid.model import Cell, Tile, TileAsCorners, TileAsSpan
+from source.grid.model import Cell, Tile, TileAsCorners, TileAsStep
 
 
 def test_TileAsCorners_normalize() -> None:
@@ -21,16 +21,16 @@ def test_TileAsCorners_normalize() -> None:
     # }}} Assert
 
 
-def test_TileAsSpan_as_corners__when_normalized_and_origin() -> None:
+def test_TileAsStep_as_corners__when_normalized_and_origin() -> None:
     # Setup {{{
-    tile_as_span = TileAsSpan(
+    tile_as_step = TileAsStep(
         cell=Cell(0, 0),
-        span=Cell(2, 3),
+        step=Cell(2, 3),
     )
     # }}} Setup
 
     # Act {{{
-    tile_as_corners = tile_as_span.as_corners()
+    tile_as_corners = tile_as_step.as_corners()
     # }}} Act
 
     # Assert {{{
