@@ -752,7 +752,6 @@ class TileGrid:
             solver.addConstraint(tile_var.span_x <= x_length_new)
 
             match mode:
-
                 case "scale":
                     # Scaling {{{
 
@@ -764,7 +763,7 @@ class TileGrid:
 
                     a = self.get_tile_by_handle(tile_var.handle)
                     if a is None:
-                        raise Exception
+                        raise Unreachable
 
                     solver.addConstraint(
                         (tile_var.span_x + 1)
@@ -774,7 +773,6 @@ class TileGrid:
                         )
                     )
                     # }}}
-
                 case "balance":
                     # Balancing {{{
                     solver.addConstraint(
