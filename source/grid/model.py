@@ -694,7 +694,7 @@ class TileGrid:
 
         self.raise_if_handle_error()
 
-        @dataclasses.dataclass(frozen=True, slots=True)
+        @dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
         class TileVar:
             cell_x: Variable
             step_x: Variable
@@ -837,11 +837,91 @@ class Orientation(Enum):
     HORIZONTAL = auto()
     VERTICAL = auto()
 
+    def invert(self):
+        return (
+            Orientation.VERTICAL
+            if self == Orientation.HORIZONTAL
+            else Orientation.HORIZONTAL
+        )
 
-@dataclasses.dataclass(frozen=True, slots=True)
+
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
 class Line:
     coordinate: int
     orientation: Orientation
+
+    def rotate_clockwise(self) -> "Line":
+        return Line(
+            coordinate=(
+                self.coordinate
+                if self.orientation == Orientation.VERTICAL
+                else -self.coordinate
+            ),
+            orientation=self.orientation.invert(),
+        )
+
+    def rotate_counterclockwise(self) -> "Line":
+        return Line(
+            coordinate=(
+                self.coordinate
+                if self.orientation == Orientation.HORIZONTAL
+                else -self.coordinate
+            ),
+            orientation=self.orientation.invert(),
+        )
+
+    def fully_contains_tile(self, tile: Tile) -> bool:
+        step = tile.as_step()
+
+        return (
+            (self.orientation == Orientation.HORIZONTAL)
+            and (step.step.y == 0)
+            and (step.cell.y == self.coordinate)
+        ) or (
+            (self.orientation == Orientation.VERTICAL)
+            and (step.step.x == 0)
+            and (step.cell.x == self.coordinate)
+        )
+
+    def intersects_tile(self, tile: Tile) -> bool:
+        corners = tile.as_corners()
+
+        return (
+            (self.orientation == Orientation.HORIZONTAL)
+            and (corners.c1.y <= self.coordinate <= corners.c2.y)
+        ) or (
+            (self.orientation == Orientation.VERTICAL)
+            and (corners.c1.x <= self.coordinate <= corners.c2.x)
+        )
+
+    def touches_tile(self, tile: Tile) -> bool:
+        corners = tile.as_corners()
+
+        return (
+            (self.orientation == Orientation.HORIZONTAL)
+            and (self.coordinate in (corners.c1.y, corners.c2.y))
+        ) or (
+            (self.orientation == Orientation.VERTICAL)
+            and (self.coordinate in (corners.c1.x, corners.c2.x))
+        )
+
+    def on_positive_side_of_tile(self, tile: Tile) -> bool:
+        c = tile.as_corners()
+
+        return (
+            (self.orientation == Orientation.HORIZONTAL) and (self.coordinate >= c.c2.y)
+        ) or (
+            (self.orientation == Orientation.VERTICAL) and (self.coordinate >= c.c2.x)
+        )
+
+    def on_negative_side_of_tile(self, tile: Tile) -> bool:
+        c = tile.as_corners()
+
+        return (
+            (self.orientation == Orientation.HORIZONTAL) and (self.coordinate <= c.c1.y)
+        ) or (
+            (self.orientation == Orientation.VERTICAL) and (self.coordinate <= c.c1.x)
+        )
 
 
 # }}} Line
