@@ -263,59 +263,6 @@ class Tile:
             for y in range(tile.c1.y, tile.c2.y + 1)
         )
 
-    def relation_to_line(self, line: "Line") -> "TileRelationToLine":
-        step = self.as_step()
-        corners = self.as_corners()
-
-        if (
-            (line.orientation == Orientation.HORIZONTAL)
-            and (step.step.y == 0)
-            and (step.cell.y == line.coordinate)
-        ) or (
-            (line.orientation == Orientation.VERTICAL)
-            and (step.step.x == 0)
-            and (step.cell.x == line.coordinate)
-        ):
-            return TileRelationToLine.FULLY_CONTAINED
-
-        if (
-            (line.orientation == Orientation.HORIZONTAL)
-            and (line.coordinate < corners.c1.y)
-        ) or (
-            (line.orientation == Orientation.VERTICAL)
-            and (line.coordinate < corners.c1.x)
-        ):
-            return TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE
-
-        if (
-            (line.orientation == Orientation.HORIZONTAL)
-            and (line.coordinate > corners.c2.y)
-        ) or (
-            (line.orientation == Orientation.VERTICAL)
-            and (line.coordinate > corners.c2.x)
-        ):
-            return TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE
-
-        if (
-            (line.orientation == Orientation.HORIZONTAL)
-            and (line.coordinate == corners.c1.y)
-        ) or (
-            (line.orientation == Orientation.VERTICAL)
-            and (line.coordinate == corners.c1.x)
-        ):
-            return TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-
-        if (
-            (line.orientation == Orientation.HORIZONTAL)
-            and (line.coordinate == corners.c2.y)
-        ) or (
-            (line.orientation == Orientation.VERTICAL)
-            and (line.coordinate == corners.c2.x)
-        ):
-            return TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-
-        return TileRelationToLine.HAVE_COMMON_CELLS
-
     def rotate_undo(self, *, right: CardinalDirection) -> "Tile":
         match right:
             case CardinalDirection.RIGHT:
@@ -449,16 +396,6 @@ class TileGrid:
             sorted(box.shred_horizontally(), key=lambda l: l.coordinate, reverse=True),
             sorted(box.shred_vertically(), key=lambda l: l.coordinate, reverse=True),
         ):
-            # # {{{ Prevent "shear line" problem. I.e. when
-            # # 112 -> 12
-            # # 344    34
-            # if {
-            #     TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE,
-            #     TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE,
-            # }.issubset(t.relation_to_line(line) for t in current_grid.get_tiles()):
-            #     continue
-            # # }}}
-
             delta = {
                 Orientation.HORIZONTAL: Cell(x=0, y=-1),
                 Orientation.VERTICAL: Cell(x=-1, y=0),
@@ -466,12 +403,12 @@ class TileGrid:
 
             new_tiles: list[Tile] = []
             for tile in current_grid.get_tiles():
-                match tile.relation_to_line(line):
-                    case TileRelationToLine.FULLY_CONTAINED:
-                        break
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE:
+                if line.fully_contains_tile(tile):
+                    break
+                elif not line.intersects_tile(tile):
+                    if line.on_positive_side_of_tile(tile):
                         new_tiles.append(tile)
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE:
+                    elif line.on_negative_side_of_tile(tile):
                         new_tiles.append(
                             tile.keep_handle(
                                 TileAsCorners(
@@ -480,19 +417,16 @@ class TileGrid:
                                 )
                             )
                         )
-                    case (
-                        TileRelationToLine.HAVE_COMMON_CELLS
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-                    ):
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1,
-                                    c2=tile.as_corners().c2 + delta,
-                                )
+                else:
+                    new_tiles.append(
+                        tile.keep_handle(
+                            TileAsCorners(
+                                c1=tile.as_corners().c1,
+                                c2=tile.as_corners().c2 + delta,
                             )
                         )
+                    )
+
             else:  # only executed if the loop did NOT break
                 current_grid = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
@@ -568,43 +502,39 @@ class TileGrid:
             return self
 
         new_tiles: list[Tile] = []
+        line = Line(
+            coordinate=anchor_tile.as_corners().c2.x,
+            orientation=Orientation.VERTICAL,
+        )
         # Make space (to the RIGHT) {{{
         for tile in current_grid.get_tiles():
             if tile.handle == anchor_handle:
                 new_tiles.append(tile)
 
-            else:
-                match tile.relation_to_line(
-                    Line(
-                        coordinate=anchor_tile.as_corners().c2.x,
-                        orientation=Orientation.VERTICAL,
+            elif (not line.intersects_tile(tile)) and line.on_positive_side_of_tile(
+                tile
+            ):
+                new_tiles.append(tile)
+            elif line.intersects_tile(tile):
+                new_tiles.append(
+                    tile.keep_handle(
+                        TileAsCorners(
+                            c1=tile.as_corners().c1,
+                            c2=tile.as_corners().c2 + Cell(x=1, y=0),
+                        )
                     )
-                ):
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_NEGATIVE:
-                        new_tiles.append(tile)
-                    case (
-                        TileRelationToLine.FULLY_CONTAINED
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-                        | TileRelationToLine.HAVE_COMMON_CELLS
-                    ):
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1,
-                                    c2=tile.as_corners().c2 + Cell(x=1, y=0),
-                                )
-                            )
+                )
+            elif (not line.intersects_tile(tile)) and line.on_negative_side_of_tile(
+                tile
+            ):
+                new_tiles.append(
+                    tile.keep_handle(
+                        TileAsCorners(
+                            c1=tile.as_corners().c1 + Cell(x=1, y=0),
+                            c2=tile.as_corners().c2 + Cell(x=1, y=0),
                         )
-                    case TileRelationToLine.NO_INTERSECT_AND_MORE_POSITIVE:
-                        new_tiles.append(
-                            tile.keep_handle(
-                                TileAsCorners(
-                                    c1=tile.as_corners().c1 + Cell(x=1, y=0),
-                                    c2=tile.as_corners().c2 + Cell(x=1, y=0),
-                                )
-                            )
-                        )
+                    )
+                )
         # }}}
 
         # Insert new Tile (on the RIGHT) {{{
@@ -724,19 +654,10 @@ class TileGrid:
         # Lines {{{
         tile_vars_groups: defaultdict[int, list[TileVar]] = defaultdict(list)
         for y in self.get_ys():
+            line = Line(coordinate=y, orientation=Orientation.HORIZONTAL)
             for tile in tiles_sorted:
-                match tile.relation_to_line(
-                    Line(coordinate=y, orientation=Orientation.HORIZONTAL)
-                ):
-                    case (
-                        TileRelationToLine.HAVE_COMMON_CELLS
-                        | TileRelationToLine.FULLY_CONTAINED
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_NEGATIVE
-                        | TileRelationToLine.EDGE_CONTAINED_REST_MORE_POSITIVE
-                    ):
-                        tile_vars_groups[y].append(tile_vars[tile.handle])
-                    case _:
-                        pass
+                if line.intersects_tile(tile):
+                    tile_vars_groups[y].append(tile_vars[tile.handle])
 
         max_tiles = max(len(tiles) for tiles in tile_vars_groups.values())
         # }}}
@@ -925,15 +846,6 @@ class Line:
 
 
 # }}} Line
-
-
-class TileRelationToLine(Enum):
-    NO_INTERSECT_AND_MORE_NEGATIVE = auto()
-    NO_INTERSECT_AND_MORE_POSITIVE = auto()
-    HAVE_COMMON_CELLS = auto()
-    FULLY_CONTAINED = auto()
-    EDGE_CONTAINED_REST_MORE_NEGATIVE = auto()
-    EDGE_CONTAINED_REST_MORE_POSITIVE = auto()
 
 
 def get_grid_section(*, cell: Cell, origin_tile: Tile) -> GridSection:
