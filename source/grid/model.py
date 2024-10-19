@@ -11,23 +11,22 @@ import dataclasses
 import functools
 import itertools
 from collections import Counter, defaultdict
-from enum import Enum, auto
+from enum import Enum, IntEnum, auto
 from types import MappingProxyType
-from typing import Generator, Iterable, Literal, NewType, Sequence
+from typing import Iterable, Literal, NewType, Sequence
 
 from kiwisolver import Expression, Solver, Variable
-from typing_extensions import deprecated
 
 
 class Unreachable(Exception):
     pass
 
 
-class CardinalDirection(Enum):
-    UP = auto()
-    DOWN = auto()
-    LEFT = auto()
-    RIGHT = auto()
+class CardinalDirection(IntEnum):
+    UP = 0
+    RIGHT = 1
+    DOWN = 2
+    LEFT = 3
 
 
 class GridSection(Enum):
@@ -80,6 +79,19 @@ class Cell:
 
     def rotate_counterclockwise(self) -> "Cell":
         return Cell(x=self.y, y=-self.x)
+
+    def rotate(self, side: CardinalDirection, /, *, to: CardinalDirection) -> "Cell":
+        match (to - side) % 4:
+            case 0:
+                return self
+            case 1:
+                return self.rotate_clockwise()
+            case 2:
+                return self.rotate_clockwise().rotate_clockwise()
+            case 3:
+                return self.rotate_counterclockwise()
+            case _:
+                raise Unreachable
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -141,7 +153,7 @@ assert delta.y >= 0
 type IntHandle = int
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
 class Tile:
     tile: TileAsCornersNormalized
     handle: IntHandle
@@ -156,18 +168,9 @@ class Tile:
     def keep_handle(self, arg: TileAsCorners | TileAsStep) -> "Tile":
         return Tile.build(arg, handle=self.handle)
 
-    @deprecated("I probably don't need it")
     @staticmethod
-    def from_cells(cells: Iterable[Cell]) -> "Tile | None":
-        cells = set(cells)
-
-        box = get_box(Tile.build(TileAsCorners(c1=cell, c2=cell)) for cell in cells)
-        box_cells = set(box.cells())
-
-        if box_cells == cells:
-            return box
-        else:
-            return None
+    def from_cells(cells: Iterable[Cell]) -> "Tile":
+        return get_box(Tile.build(TileAsCorners(c1=cell, c2=cell)) for cell in cells)
 
     def as_corners(self) -> TileAsCornersNormalized:
         return self.tile
@@ -182,24 +185,42 @@ class Tile:
             )
         )
 
-    def cells(self) -> Generator[Cell, None, None]:
-        tile = self.as_corners()
-
-        for x in range(tile.c1.x, tile.c2.x + 1):
-            for y in range(tile.c1.y, tile.c2.y + 1):
-                yield Cell(x=x, y=y)
-
     def contains_cell(self, cell: Cell) -> bool:
-        return cell in self.cells()
+        c = self.as_corners()
+        return (c.c1.x <= cell.x <= c.c2.x) and (c.c1.y <= cell.y <= c.c2.y)
 
-    def intersection_cells(self, other: "Tile") -> set[Cell]:
-        return set(self.cells()).intersection(other.cells())
+    def intersection(self, other: "Tile") -> "Tile | None":
+        self_s = self.as_step()
+        other_s = other.as_step()
+
+        cells = tuple(
+            cell
+            for cell in (
+                self_s.cell,
+                self_s.cell + dataclasses.replace(self_s.step, x=0),
+                self_s.cell + dataclasses.replace(self_s.step, y=0),
+                self_s.cell + self_s.step,
+            )
+            if other.contains_cell(cell)
+        ) + tuple(
+            cell
+            for cell in (
+                other_s.cell,
+                other_s.cell + dataclasses.replace(other_s.step, x=0),
+                other_s.cell + dataclasses.replace(other_s.step, y=0),
+                other_s.cell + other_s.step,
+            )
+            if self.contains_cell(cell)
+        )
+        if len(cells) > 0:
+            return Tile.from_cells(cells)
+        return None
 
     def intersects_with(self, other: "Tile") -> bool:
-        return len(self.intersection_cells(other)) > 0
+        return self.intersection(other) is not None
 
     def contains_tile(self, other: "Tile") -> bool:
-        return self.intersection_cells(other) == set(other.cells())
+        return self.intersection(other) == other
 
     def min_max(self: "Tile", other: "Tile", /) -> "Tile":
         tile_1 = self.as_corners()
@@ -218,35 +239,6 @@ class Tile:
             )
         )
 
-    @deprecated("I probably don't need it")
-    def slice(self, *, line: "Line") -> "tuple[Tile, Tile] | Tile":
-        tile = self.as_corners()
-
-        if (
-            (line.orientation == Orientation.HORIZONTAL)
-            and ((line.coordinate <= tile.c1.y) or (line.coordinate > tile.c2.y))
-        ) or (
-            (line.orientation == Orientation.VERTICAL)
-            and ((line.coordinate <= tile.c1.x) or (line.coordinate > tile.c2.x))
-        ):
-            return self
-
-        t1c2, t2c1 = {
-            Orientation.HORIZONTAL: (
-                Cell(x=tile.c2.x, y=line.coordinate - 1),
-                Cell(x=tile.c1.x, y=line.coordinate),
-            ),
-            Orientation.VERTICAL: (
-                Cell(x=line.coordinate - 1, y=tile.c2.y),
-                Cell(x=line.coordinate, y=tile.c1.y),
-            ),
-        }[line.orientation]
-
-        return (
-            Tile.build(TileAsCorners(c1=tile.c1, c2=t1c2)),
-            Tile.build(TileAsCorners(c1=t2c1, c2=tile.c2)),
-        )
-
     def shred_vertically(self) -> tuple["Line", ...]:
         tile = self.as_corners()
 
@@ -263,28 +255,6 @@ class Tile:
             for y in range(tile.c1.y, tile.c2.y + 1)
         )
 
-    def rotate_undo(self, *, right: CardinalDirection) -> "Tile":
-        match right:
-            case CardinalDirection.RIGHT:
-                return self
-            case CardinalDirection.DOWN:
-                return self.rotate_counterclockwise()
-            case CardinalDirection.UP:
-                return self.rotate_clockwise()
-            case CardinalDirection.LEFT:
-                return self.rotate_counterclockwise().rotate_counterclockwise()
-
-    def rotate(self, *, right: CardinalDirection) -> "Tile":
-        match right:
-            case CardinalDirection.RIGHT:
-                return self
-            case CardinalDirection.DOWN:
-                return self.rotate_clockwise()
-            case CardinalDirection.UP:
-                return self.rotate_counterclockwise()
-            case CardinalDirection.LEFT:
-                return self.rotate_clockwise().rotate_clockwise()
-
     def rotate_clockwise(self) -> "Tile":
         return self.keep_handle(
             TileAsCorners(
@@ -298,6 +268,14 @@ class Tile:
             TileAsCorners(
                 c1=self.as_corners().c1.rotate_counterclockwise(),
                 c2=self.as_corners().c2.rotate_counterclockwise(),
+            )
+        )
+
+    def rotate(self, side: CardinalDirection, /, *, to: CardinalDirection) -> "Tile":
+        return self.keep_handle(
+            TileAsCorners(
+                c1=self.as_corners().c1.rotate(side, to=to),
+                c2=self.as_corners().c2.rotate(side, to=to),
             )
         )
 
@@ -338,15 +316,6 @@ class TileGrid:
     def centralize_origin(self) -> "TileGrid":
         return self.translate(delta=Cell(x=0, y=0) - self.origin.as_corners().c1)
 
-    def get_uncovered_cells(self) -> set[Cell]:
-        tiles = self.get_tiles()
-        box = get_box(tiles)
-
-        tiles_cells = set(itertools.chain(*(map(lambda t: t.cells(), tiles))))
-        box_cells = set(box.cells())
-
-        return box_cells - tiles_cells
-
     def get_tile_by_handle(self, handle: IntHandle) -> Tile | None:
         for tile in self.get_tiles():
             if tile.handle == handle:
@@ -367,12 +336,6 @@ class TileGrid:
         if errors := self.get_handle_errors():
             raise Exception(str(errors))
 
-    def rotate_undo(self, *, right: CardinalDirection) -> "TileGrid":
-        return TileGrid.from_tiles(x.rotate_undo(right=right) for x in self.get_tiles())
-
-    def rotate(self, *, right: CardinalDirection) -> "TileGrid":
-        return TileGrid.from_tiles(x.rotate(right=right) for x in self.get_tiles())
-
     def rotate_clockwise(self) -> "TileGrid":
         return TileGrid.from_tiles(x.rotate_clockwise() for x in self.get_tiles())
 
@@ -380,6 +343,11 @@ class TileGrid:
         return TileGrid.from_tiles(
             x.rotate_counterclockwise() for x in self.get_tiles()
         )
+
+    def rotate(
+        self, side: CardinalDirection, /, *, to: CardinalDirection
+    ) -> "TileGrid":
+        return TileGrid.from_tiles(t.rotate(side, to=to) for t in self.get_tiles())
 
     def delete_by_handle(self, handle: IntHandle) -> "TileGrid":
         return TileGrid(
@@ -487,19 +455,25 @@ class TileGrid:
         direction: CardinalDirection,
         new_tile_handle: IntHandle,
     ) -> "TileGrid":
+        return (
+            self.rotate(direction, to=CardinalDirection.RIGHT)
+            .insert_to_right(
+                anchor_handle=anchor_handle, new_tile_handle=new_tile_handle
+            )
+            .rotate(CardinalDirection.RIGHT, to=direction)
+        )
+
+    def insert_to_right(
+        self,
+        *,
+        anchor_handle: IntHandle,
+        new_tile_handle: IntHandle,
+    ) -> "TileGrid":
         # Guard {{{
         anchor_tile = self.get_tile_by_handle(anchor_handle)
         if anchor_tile is None:
             return self
         # }}}
-
-        # Prepare. Rotate grid so that insert to the RIGHT needs to be done {{{
-        current_grid = self.rotate_undo(right=direction)
-        # }}}
-
-        anchor_tile = current_grid.get_tile_by_handle(anchor_handle)
-        if anchor_tile is None:
-            return self
 
         new_tiles: list[Tile] = []
         line = Line(
@@ -507,7 +481,7 @@ class TileGrid:
             orientation=Orientation.VERTICAL,
         )
         # Make space (to the RIGHT) {{{
-        for tile in current_grid.get_tiles():
+        for tile in self.get_tiles():
             if tile.handle == anchor_handle:
                 new_tiles.append(tile)
 
@@ -549,12 +523,7 @@ class TileGrid:
         )
         # }}}
 
-        current_grid = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
-        # Rotate back to original orientation {{{
-        current_grid = current_grid.rotate(right=direction)
-        # }}}
-
-        return current_grid
+        return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
     def split_tile(
         self,
@@ -563,18 +532,29 @@ class TileGrid:
         direction: CardinalDirection,
         new_tile_handle: IntHandle,
     ) -> "TileGrid":
+        return (
+            self.rotate(direction, to=CardinalDirection.RIGHT)
+            .split_tile_to_right(
+                tile_handle=tile_handle,
+                new_tile_handle=new_tile_handle,
+            )
+            .rotate(CardinalDirection.RIGHT, to=direction)
+        )
+
+    def split_tile_to_right(
+        self,
+        *,
+        tile_handle: IntHandle,
+        new_tile_handle: IntHandle,
+    ) -> "TileGrid":
         # Guards {{{
         tile = self.get_tile_by_handle(tile_handle)
         if tile is None:
             return self
         # }}}
 
-        # Prepare. Rotate grid so that insert to the RIGHT needs to be done {{{
-        current_grid = self.rotate_undo(right=direction)
-        # }}}
-
         new_tiles: list[Tile] = []
-        for tile in current_grid.get_tiles():
+        for tile in self.get_tiles():
             corners = tile.as_corners()
             width = corners.c2.x - corners.c1.x
 
@@ -597,17 +577,11 @@ class TileGrid:
                 )
             )
 
-        current_grid = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
-
-        # Rotate back to original orientation {{{
-        current_grid = current_grid.rotate(right=direction)
-        # }}}
-
-        return current_grid
+        return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
 
     def translate(self, *, delta: Cell) -> "TileGrid":
         return TileGrid.from_tiles(
-            tuple(tile.translate(delta=delta) for tile in self.get_tiles())
+            tile.translate(delta=delta) for tile in self.get_tiles()
         )
 
     def resize(self, *, new_boundary: Cell) -> "TileGrid":
@@ -849,9 +823,8 @@ class Line:
 
 
 def get_grid_section(*, cell: Cell, origin_tile: Tile) -> GridSection:
-    for c in origin_tile.cells():
-        if c == cell:
-            return GridSection.ORIGIN
+    if origin_tile.contains_cell(cell):
+        return GridSection.ORIGIN
 
     origin_corners = origin_tile.as_corners()
 
