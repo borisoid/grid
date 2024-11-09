@@ -16,15 +16,16 @@
             name = "py-fhs-env";
             targetPkgs = p: [
                 (pp.python.withPackages (ppp: [
-                    ppp.typing-extensions
                     ppp.kiwisolver
                     ppp.pygame
+
                     ppp.pytest
+                    ppp.typing-extensions
+                    ppp.mypy
+                    ppp.black
+                    ppp.isort
                 ]))
-                p.mypy
                 p.pyright
-                p.black
-                p.isort
 
                 p.stdenv
                 p.stdenv.cc.cc.lib

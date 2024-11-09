@@ -95,6 +95,18 @@ class Cell:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class TileAsSpan:
+    cell: Cell
+    span: Cell
+
+    def as_corners(self) -> "TileAsCornersNormalized":
+        return TileAsCorners(
+            c1=self.cell,
+            c2=self.cell + self.span + Cell(-1, -1),
+        ).normalize()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class TileAsStep:
     cell: Cell
     step: Cell
@@ -125,6 +137,16 @@ class TileAsCorners:
             )
         )
 
+
+TileAsSpanNormalized = NewType("TileAsSpanNormalized", TileAsSpan)
+"""
+`cell` is the top left corner - `cell.x` and `cell.y` are low.
+
+```
+assert cell.span.x >= 1
+assert cell.span.y >= 1
+```
+"""
 
 TileAsStepNormalized = NewType("TileAsStepNormalized", TileAsStep)
 """
@@ -159,8 +181,16 @@ class Tile:
     handle: IntHandle
 
     @staticmethod
-    def build(arg: TileAsCorners | TileAsStep, /, *, handle: IntHandle = -1) -> "Tile":
+    def build(
+        arg: TileAsCorners | TileAsStep | TileAsSpan,
+        /,
+        *,
+        handle: IntHandle = -1,
+    ) -> "Tile":
         if isinstance(arg, TileAsStep):
+            return Tile(tile=arg.as_corners(), handle=handle)
+
+        if isinstance(arg, TileAsSpan):
             return Tile(tile=arg.as_corners(), handle=handle)
 
         return Tile(tile=arg.normalize(), handle=handle)
@@ -182,6 +212,16 @@ class Tile:
             TileAsStep(
                 cell=tile.c1,
                 step=tile.c2 - tile.c1,
+            )
+        )
+
+    def as_span(self) -> TileAsSpanNormalized:
+        tile = self.as_corners()
+
+        return TileAsSpanNormalized(
+            TileAsSpan(
+                cell=tile.c1,
+                span=tile.c2 - tile.c1 + Cell(1, 1),
             )
         )
 
@@ -601,10 +641,10 @@ class TileGrid:
         @dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
         class TileVar:
             cell_x: Variable
-            step_x: Variable
+            span_x: Variable
 
             cell_y: int
-            step_y: int
+            span_y: int
 
             handle: IntHandle
 
@@ -616,9 +656,9 @@ class TileGrid:
         tile_vars: dict[IntHandle, TileVar] = {
             tile.handle: TileVar(
                 cell_x=Variable(f"cell.x.{tile.handle}"),
-                step_x=Variable(f"step.x.{tile.handle}"),
-                cell_y=tile.as_step().cell.y,
-                step_y=tile.as_step().step.y,
+                span_x=Variable(f"span.x.{tile.handle}"),
+                cell_y=tile.as_span().cell.y,
+                span_y=tile.as_span().span.y,
                 handle=tile.handle,
             )
             for tile in tiles_sorted
@@ -639,49 +679,43 @@ class TileGrid:
         solver = Solver()
 
         for tile_var in tile_vars.values():
-            solver.addConstraint(tile_var.step_x >= 0)
-            solver.addConstraint(tile_var.step_x <= x_length_new)
+            solver.addConstraint(tile_var.span_x >= 1)
+            solver.addConstraint(tile_var.span_x <= x_length_new)
 
             match mode:
                 case "scale":
                     # Scaling {{{
 
-                    # step_x_new   x_length_new
+                    # span_x_new   x_length_new
                     # ---------- = ------------
-                    # step_x_old   x_length_old
+                    # span_x_old   x_length_old
 
-                    # step_x_new = (step_x_old * x_length_new) / x_length_old
+                    # span_x_new = (span_x_old * x_length_new) / x_length_old
 
                     a = self.get_tile_by_handle(tile_var.handle)
                     if a is None:
                         raise Unreachable
 
                     solver.addConstraint(
-                        (tile_var.step_x + 1)
+                        tile_var.span_x
                         >= (
-                            ((a.as_step().step.x + 1) * x_length_new)
-                            // (self.get_box().as_step().step.x + 1)
+                            (a.as_span().span.x * x_length_new)
+                            // self.get_box().as_span().span.x
                         )
                     )
                     # }}}
                 case "balance":
                     # Balancing {{{
-                    solver.addConstraint(
-                        (tile_var.step_x + 1) >= (x_length_new // max_tiles)
-                    )
+                    solver.addConstraint(tile_var.span_x >= (x_length_new // max_tiles))
                     # }}}
 
         # Position constraints {{{
         for tile_vars_group in tile_vars_groups.values():
-            # Step constraints {{{
-            def reducer(
-                a: Variable | Expression, b: Variable | Expression
-            ) -> Expression:
-                return a + b
+            # Span constraints {{{
+            expression: Expression | Variable = tile_vars_group[0].span_x
+            for tile_var in tile_vars_group[1:]:
+                expression += tile_var.span_x
 
-            expression = functools.reduce(
-                reducer, (tile_vars.step_x + 1 for tile_vars in tile_vars_group)
-            )
             solver.addConstraint(expression == x_length_new)
             # }}}
 
@@ -691,9 +725,9 @@ class TileGrid:
                 solver.addConstraint(tile_vars_group[0].cell_x == 0)
 
             for i in range(1, len(tile_vars_group)):
-                previous_tile, tile = tile_vars_group[i - 1], tile_vars_group[i]
+                previous_tile, tile_var = tile_vars_group[i - 1], tile_vars_group[i]
                 solver.addConstraint(
-                    tile.cell_x == (previous_tile.cell_x + previous_tile.step_x + 1)
+                    tile_var.cell_x == (previous_tile.cell_x + previous_tile.span_x)
                 )
             # }}}
 
@@ -702,14 +736,14 @@ class TileGrid:
         solver.updateVariables()
         return TileGrid.from_tiles(
             Tile.build(
-                TileAsStep(
+                TileAsSpan(
                     cell=Cell(
                         x=int(tile_var.cell_x.value()),
                         y=tile_var.cell_y,
                     ),
-                    step=Cell(
-                        x=int(tile_var.step_x.value()),
-                        y=tile_var.step_y,
+                    span=Cell(
+                        x=int(tile_var.span_x.value()),
+                        y=tile_var.span_y,
                     ),
                 ),
                 handle=tile_var.handle,
@@ -732,7 +766,7 @@ class Orientation(Enum):
     HORIZONTAL = auto()
     VERTICAL = auto()
 
-    def invert(self):
+    def invert(self) -> "Orientation":
         return (
             Orientation.VERTICAL
             if self == Orientation.HORIZONTAL
