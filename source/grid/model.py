@@ -93,6 +93,12 @@ class Cell:
             case _:
                 raise Unreachable
 
+    def mirror_horizontally(self) -> "Cell":
+        return Cell(x=-self.x, y=self.y)
+
+    def mirror_vertically(self) -> "Cell":
+        return Cell(x=self.x, y=-self.y)
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class TileAsSpan:
@@ -230,27 +236,11 @@ class Tile:
         return (c.c1.x <= cell.x <= c.c2.x) and (c.c1.y <= cell.y <= c.c2.y)
 
     def intersection(self, other: "Tile") -> "Tile | None":
-        self_s = self.as_step()
-        other_s = other.as_step()
-
         cells = tuple(
-            cell
-            for cell in (
-                self_s.cell,
-                self_s.cell + dataclasses.replace(self_s.step, x=0),
-                self_s.cell + dataclasses.replace(self_s.step, y=0),
-                self_s.cell + self_s.step,
+            itertools.chain(
+                (cell for cell in self.corner_cells() if other.contains_cell(cell)),
+                (cell for cell in other.corner_cells() if self.contains_cell(cell)),
             )
-            if other.contains_cell(cell)
-        ) + tuple(
-            cell
-            for cell in (
-                other_s.cell,
-                other_s.cell + dataclasses.replace(other_s.step, x=0),
-                other_s.cell + dataclasses.replace(other_s.step, y=0),
-                other_s.cell + other_s.step,
-            )
-            if self.contains_cell(cell)
         )
         if len(cells) > 0:
             return Tile.from_cells(cells)
@@ -319,6 +309,29 @@ class Tile:
             )
         )
 
+    def mirror_horizontally(self) -> "Tile":
+        return self.keep_handle(
+            TileAsCorners(
+                c1=self.as_corners().c1.mirror_horizontally(),
+                c2=self.as_corners().c2.mirror_horizontally(),
+            )
+        )
+
+    def mirror_vertically(self) -> "Tile":
+        return self.keep_handle(
+            TileAsCorners(
+                c1=self.as_corners().c1.mirror_vertically(),
+                c2=self.as_corners().c2.mirror_vertically(),
+            )
+        )
+
+    def mirror(self, orientation: "Orientation") -> "Tile":
+        match orientation:
+            case Orientation.HORIZONTAL:
+                return self.mirror_horizontally()
+            case Orientation.VERTICAL:
+                return self.mirror_vertically()
+
     def translate(self, *, delta: Cell) -> "Tile":
         return self.keep_handle(
             TileAsCorners(
@@ -326,6 +339,88 @@ class Tile:
                 c2=self.as_corners().c2 + delta,
             )
         )
+
+    def corner_cells(self) -> tuple[Cell, Cell, Cell, Cell]:
+        """
+        Returns corner cells with these indexes:
+        ```
+        0--1
+        |  |
+        2--3
+        ```
+        """
+
+        self_s = self.as_step()
+
+        return (
+            self_s.cell,
+            self_s.cell + dataclasses.replace(self_s.step, y=0),
+            self_s.cell + dataclasses.replace(self_s.step, x=0),
+            self_s.cell + self_s.step,
+        )
+
+    def free(self, area: "Tile", /, prefer: "Orientation") -> "Tile | None":
+        curr: "Tile | None" = self
+
+        rotate = prefer == Orientation.VERTICAL
+
+        if rotate:
+            curr = curr.rotate(CardinalDirection.UP, to=CardinalDirection.RIGHT)
+            area = area.rotate(CardinalDirection.UP, to=CardinalDirection.RIGHT)
+
+        curr = curr.free_horizontal(area)
+        if curr is None:
+            return None
+
+        if rotate:
+            curr = curr.rotate(CardinalDirection.RIGHT, to=CardinalDirection.UP)
+
+        return curr
+
+    def free_horizontal(self, area: "Tile", /) -> "Tile | None":
+        curr = self
+
+        inter = curr.intersection(area)
+        if inter is None:
+            return curr
+
+        matching_corners = tuple(
+            t[0]
+            for t in itertools.product(curr.corner_cells(), inter.corner_cells())
+            if t[0] == t[1]
+        )
+
+        if len(matching_corners) in (1, 2):
+            pass
+        elif len(matching_corners) == 3:
+            raise Unreachable
+        else:
+            return None
+
+        area_to_free = Tile.build(
+            TileAsCorners(
+                c1=dataclasses.replace(inter.as_corners().c1, x=curr.as_corners().c1.x),
+                c2=dataclasses.replace(inter.as_corners().c2, x=curr.as_corners().c2.x),
+            )
+        )
+
+        mirror = area_to_free.as_corners().c1 == curr.as_corners().c1
+        if mirror:
+            curr = curr.mirror_vertically()
+            area_to_free = area_to_free.mirror_vertically()
+
+        # Cut bottom part
+        curr = curr.keep_handle(
+            TileAsCorners(
+                c1=curr.as_corners().c1,
+                c2=area_to_free.corner_cells()[1] - Cell(0, 1),
+            )
+        )
+
+        if mirror:
+            curr = curr.mirror_vertically()
+
+        return curr
 
 
 def get_box(tiles: Iterable[Tile]) -> Tile:
@@ -388,6 +483,12 @@ class TileGrid:
         self, side: CardinalDirection, /, *, to: CardinalDirection
     ) -> "TileGrid":
         return TileGrid.from_tiles(t.rotate(side, to=to) for t in self.get_tiles())
+
+    def mirror_horizontally(self) -> "TileGrid":
+        return TileGrid.from_tiles(t.mirror_horizontally() for t in self.get_tiles())
+
+    def mirror_vertically(self) -> "TileGrid":
+        return TileGrid.from_tiles(t.mirror_vertically() for t in self.get_tiles())
 
     def delete_by_handle(self, handle: IntHandle) -> "TileGrid":
         return TileGrid(
@@ -757,6 +858,14 @@ class TileGrid:
                 *((t.c1.y, t.c2.y) for t in (t.as_corners() for t in self.get_tiles()))
             )
         )
+
+    def snap_verticals(self, *, proximity: int = 1) -> "TileGrid":
+        raise NotImplementedError
+
+    def snap_vertical(self, *, proximity: int = 1) -> "TileGrid":
+        # a = tuple(itertools.combinations(self.get_tiles(), 2))
+        # a += tuple(ts[::-1] for ts in a)
+        raise NotImplementedError
 
 
 # Line {{{

@@ -1,4 +1,5 @@
 {
+    "black-formatter.path": ["/usr/bin/black"],
     "files.exclude": {
         "**/__pycache__": true,
         "**/.mypy_cache": true
