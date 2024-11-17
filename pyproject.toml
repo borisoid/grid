@@ -1,34 +1,27 @@
 [project]
 name = "grid"
 version = "0.1.0"
-description = "Default template for PDM package"
+description = "Grid"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "GPL-3.0-or-later"}
 authors = [
     {name = "borisoid", email = "boris.lazarev01@gmail.com"},
     {name = "borisoid", email = "boris.lazarev90@mail.ru"},
 ]
 
-requires-python = "==3.12.*"
+requires-python = ">=3.12"
 dependencies = [
     "pygame>=2.5.2",
-    "cassowary>=0.5.2",
     "kiwisolver>=1.4.5",
 ]
 
-[tool.pdm]
-distribution = false
-
-[tool.pdm.scripts]
-main = "python -m source.grid"
-
-[tool.pdm.dev-dependencies]
+[project.optional-dependencies]
 dev = [
-    "mypy>=1.8.0",
     "pytest>=8.1.1",
+    "mypy>=1.8.0",
+    "pyright>=1.1.362",
     "black>=24.3.0",
     "isort>=5.13.2",
-    "pyright>=1.1.362",
 ]
 
 [tool.pytest.ini_options]
@@ -64,11 +57,10 @@ exclude = [
 [tool.isort]
 profile = "black"
 lines_after_imports = 2
-# line_length = 100
+line_length = 88  # Default
 group_by_package = true
 ensure_newline_before_comments = true
 
 [tool.black]
-line-length = 88  # default
-# line-length = 100
+line-length = 88  # Default
 target-version = ['py312']

@@ -1,4 +1,4 @@
-from source.grid.model import Cell, Tile, TileAsCorners, TileAsStep
+from grid.model import Cell, TileAsCorners, TileAsStep
 
 
 def test_TileAsCorners_normalize() -> None:

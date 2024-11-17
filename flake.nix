@@ -3,18 +3,15 @@
         nixPackages.url = "github:NixOS/nixpkgs/nixos-24.05";
     };
 
-    outputs = { nixPackages, ... }@inputs:
-    let
+    outputs = { nixPackages, ... }@inputs: let
         system = "x86_64-linux";
-
         p = nixPackages.legacyPackages.${system};
-        pp = p.python312Packages;
-
-        inherit (nixPackages) lib;
     in {
-        devShells.${system}.default = (p.buildFHSUserEnv {
+        devShells.${system}.default = (p.buildFHSEnv {
             name = "py-fhs-env";
-            targetPkgs = p: [
+            targetPkgs = p: let
+                pp = p.python312Packages;
+            in [
                 (pp.python.withPackages (ppp: [
                     ppp.kiwisolver
                     ppp.pygame

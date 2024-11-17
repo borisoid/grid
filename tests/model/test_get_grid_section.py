@@ -1,4 +1,4 @@
-from source.grid.model import Cell, GridSection, Tile, TileAsCorners, get_grid_section
+from grid.model import Cell, GridSection, Tile, TileAsCorners, get_grid_section
 
 
 def test_get_grid_section__when_origin() -> None:

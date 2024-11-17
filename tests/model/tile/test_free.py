@@ -1,4 +1,4 @@
-from source.grid.model import Cell, Orientation, Tile, TileAsCorners
+from grid.model import Cell, Orientation, Tile, TileAsCorners
 
 
 def test_1() -> None:

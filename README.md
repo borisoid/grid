@@ -1,6 +1,6 @@
-# grid
+# Grid
 
+### Running
 ```sh
-$ pdm --version
-PDM, version 2.12.2
+python -m grid
 ```
