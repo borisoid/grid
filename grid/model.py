@@ -13,7 +13,7 @@ import itertools
 from collections import Counter, defaultdict
 from enum import Enum, IntEnum, auto
 from types import MappingProxyType
-from typing import Iterable, Literal, NewType, Sequence
+from typing import Iterable, Literal, NewType
 
 from kiwisolver import Expression, Solver, Variable
 
@@ -359,7 +359,7 @@ class Tile:
             self_s.cell + self_s.step,
         )
 
-    def free(self, area: "Tile", /, prefer: "Orientation") -> "Tile | None":
+    def un_occupy(self, area: "Tile", /, *, prefer: "Orientation") -> "Tile | None":
         curr: "Tile | None" = self
 
         rotate = prefer == Orientation.VERTICAL
@@ -368,7 +368,7 @@ class Tile:
             curr = curr.rotate(CardinalDirection.UP, to=CardinalDirection.RIGHT)
             area = area.rotate(CardinalDirection.UP, to=CardinalDirection.RIGHT)
 
-        curr = curr.free_horizontal(area)
+        curr = curr.un_occupy_horizontal(area)
         if curr is None:
             return None
 
@@ -377,7 +377,7 @@ class Tile:
 
         return curr
 
-    def free_horizontal(self, area: "Tile", /) -> "Tile | None":
+    def un_occupy_horizontal(self, area: "Tile", /) -> "Tile | None":
         curr = self
 
         inter = curr.intersection(area)
@@ -435,7 +435,7 @@ def get_box(tiles: Iterable[Tile]) -> Tile:
 @dataclasses.dataclass(frozen=True, slots=True)
 class TileGrid:
     origin: Tile
-    other: Sequence[Tile]
+    other: tuple[Tile, ...]
 
     @staticmethod
     def from_tiles(tiles: Iterable[Tile]) -> "TileGrid":
@@ -537,7 +537,7 @@ class TileGrid:
                     )
 
             else:  # only executed if the loop did NOT break
-                current_grid = TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+                current_grid = TileGrid(origin=new_tiles[0], other=tuple(new_tiles[1:]))
 
         return current_grid
 
@@ -587,7 +587,7 @@ class TileGrid:
             else:  # only executed if the loop did NOT break
                 new_tiles[i] = tile
 
-        return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+        return TileGrid(origin=new_tiles[0], other=tuple(new_tiles[1:]))
 
     def insert(
         self,
@@ -664,7 +664,7 @@ class TileGrid:
         )
         # }}}
 
-        return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+        return TileGrid(origin=new_tiles[0], other=tuple(new_tiles[1:]))
 
     def split_tile(
         self,
@@ -718,7 +718,7 @@ class TileGrid:
                 )
             )
 
-        return TileGrid(origin=new_tiles[0], other=new_tiles[1:])
+        return TileGrid(origin=new_tiles[0], other=tuple(new_tiles[1:]))
 
     def translate(self, *, delta: Cell) -> "TileGrid":
         return TileGrid.from_tiles(
@@ -859,12 +859,55 @@ class TileGrid:
             )
         )
 
-    def snap_verticals(self, *, proximity: int = 1) -> "TileGrid":
-        raise NotImplementedError
+    def un_occupy(self, area: "Tile", /, *, prefer: "Orientation") -> "TileGrid | None":
+        tiles: list[Tile] = []
+        for tile in self.get_tiles():
+            processed_tile = tile.un_occupy(area, prefer=prefer)
+            if processed_tile is None:
+                return None
+            tiles.append(processed_tile)
 
-    def snap_vertical(self, *, proximity: int = 1) -> "TileGrid":
+        return TileGrid.from_tiles(tiles)
+
+    def snap_edges(self, *, proximity: int = 1) -> "TileGrid":
         # a = tuple(itertools.combinations(self.get_tiles(), 2))
         # a += tuple(ts[::-1] for ts in a)
+        raise NotImplementedError
+
+    def snap_2_edges(
+        self, handle_1: IntHandle, handle_2: IntHandle, *, proximity: int = 1
+    ) -> "TileGrid":
+
+        tile_1 = self.get_tile_by_handle(handle_1)
+        tile_2 = self.get_tile_by_handle(handle_2)
+
+        if (tile_1 is None) or (tile_2 is None):
+            raise Exception
+
+        t1 = tile_1.as_corners()
+        t2 = tile_2.as_corners()
+
+        def ok(t1: TileAsCornersNormalized, t2: TileAsCornersNormalized) -> bool:
+            """
+            t2 is under t1
+            and
+            t2's right edge is farther to the left then t1's right edge
+            """
+            return ((t1.c2.y + 1) == t2.c1.y) and (0 < (t1.c2.x - t2.c2.x) <= proximity)
+
+        if not ok(t1, t2):
+            return self
+
+        self.un_occupy(
+            Tile.build(
+                TileAsCorners(
+                    t2.c2 + Cell(1, 0),
+                    t1.c2 + Cell(0, 1),
+                ),
+            ),
+            prefer=Orientation.VERTICAL,
+        )
+
         raise NotImplementedError
 
 
