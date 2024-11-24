@@ -231,6 +231,14 @@ class Tile:
             )
         )
 
+    def corners_c1_add(self, cell: Cell) -> "Tile":
+        tc = self.as_corners()
+        return self.keep_handle(TileAsCorners(c1=tc.c1 + cell, c2=tc.c2))
+
+    def corners_c2_add(self, cell: Cell) -> "Tile":
+        tc = self.as_corners()
+        return self.keep_handle(TileAsCorners(c1=tc.c1, c2=tc.c2 + cell))
+
     def contains_cell(self, cell: Cell) -> bool:
         c = self.as_corners()
         return (c.c1.x <= cell.x <= c.c2.x) and (c.c1.y <= cell.y <= c.c2.y)
@@ -468,6 +476,12 @@ class TileGrid:
         if return_ is None:
             raise ValueError
         return return_
+
+    def replace_tiles(self, new: Iterable[Tile]) -> "TileGrid":
+        new_ = {t.handle: t for t in new}
+        return TileGrid.from_tiles(
+            new_.get(tile.handle, tile) for tile in self.get_tiles()
+        )
 
     def count_handles(self) -> Counter[IntHandle]:
         return Counter(t.handle for t in self.get_tiles())
@@ -883,41 +897,32 @@ class TileGrid:
         raise NotImplementedError
 
     def snap_2_edges(
-        self, handle_1: IntHandle, handle_2: IntHandle, *, proximity: int = 1
+        self, *, handle: IntHandle, proximity: int = 1
     ) -> "TileGrid | None":
 
-        tile_1 = self.get_tile_by_handle(handle_1)
-        tile_2 = self.get_tile_by_handle(handle_2)
+        tile_1 = self.get_tile_by_handle(handle)
+        tc1 = tile_1.as_corners()
 
-        t1 = tile_1.as_corners()
-        t2 = tile_2.as_corners()
+        max_x: int | None = None
+        tile_2: Tile | None = None
+        for t2 in self.get_tiles():
+            tc2 = t2.as_corners()
+            if (tc2.c1.y == tc1.c2.y + 1) and (tc2.c2.x + proximity <= tc1.c2.x):
+                if (max_x is None) or (tc2.c2.x > max_x):
+                    max_x = tc2.c2.x
+                    tile_2 = t2
 
-        def ok(t1: TileAsCornersNormalized, t2: TileAsCornersNormalized) -> bool:
-            """
-            t2 is under t1
-            and
-            t2's right edge is farther to the left then t1's right edge
-            """
-            return ((t1.c2.y + 1) == t2.c1.y) and (0 < (t1.c2.x - t2.c2.x) <= proximity)
-
-        if not ok(t1, t2):
-            return self
-
-        result = self.un_occupy(
-            Tile.build(
-                TileAsCorners(
-                    t2.c2 + Cell(1, 0),
-                    t1.c2 + Cell(0, 1),
-                ),
-            ),
-            prefer=Orientation.VERTICAL,
-        )
-        if result is None:
+        if tile_2 is None:
             return None
 
-        # t2_new = t2
-
-        raise NotImplementedError
+        delta_x = tc1.c2.x - tile_2.as_corners().c2.x
+        left, right = self.get_uninterrupted_vertical_right_border(tile_2.handle)
+        return self.replace_tiles(
+            itertools.chain(
+                (t.corners_c2_add(Cell(delta_x, 0)) for t in left),
+                (t.corners_c1_add(Cell(delta_x, 0)) for t in right),
+            )
+        )
 
     def get_uninterrupted_vertical_right_border(
         self, handle: IntHandle
