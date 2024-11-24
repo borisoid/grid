@@ -432,6 +432,12 @@ def get_box(tiles: Iterable[Tile]) -> Tile:
     return functools.reduce(reducer, tiles, tiles[0])
 
 
+def get_ys(tiles: Iterable[Tile]) -> set[int]:
+    return set(
+        itertools.chain(*((t.c1.y, t.c2.y) for t in (t.as_corners() for t in tiles)))
+    )
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class TileGrid:
     origin: Tile
@@ -451,11 +457,17 @@ class TileGrid:
     def centralize_origin(self) -> "TileGrid":
         return self.translate(delta=Cell(x=0, y=0) - self.origin.as_corners().c1)
 
-    def get_tile_by_handle(self, handle: IntHandle) -> Tile | None:
+    def try_get_tile_by_handle(self, handle: IntHandle) -> Tile | None:
         for tile in self.get_tiles():
             if tile.handle == handle:
                 return tile
         return None
+
+    def get_tile_by_handle(self, handle: IntHandle) -> Tile:
+        return_ = self.try_get_tile_by_handle(handle)
+        if return_ is None:
+            raise ValueError
+        return return_
 
     def count_handles(self) -> Counter[IntHandle]:
         return Counter(t.handle for t in self.get_tiles())
@@ -611,7 +623,7 @@ class TileGrid:
         new_tile_handle: IntHandle,
     ) -> "TileGrid":
         # Guard {{{
-        anchor_tile = self.get_tile_by_handle(anchor_handle)
+        anchor_tile = self.try_get_tile_by_handle(anchor_handle)
         if anchor_tile is None:
             return self
         # }}}
@@ -689,7 +701,7 @@ class TileGrid:
         new_tile_handle: IntHandle,
     ) -> "TileGrid":
         # Guards {{{
-        tile = self.get_tile_by_handle(tile_handle)
+        tile = self.try_get_tile_by_handle(tile_handle)
         if tile is None:
             return self
         # }}}
@@ -793,7 +805,7 @@ class TileGrid:
 
                     # span_x_new = (span_x_old * x_length_new) / x_length_old
 
-                    a = self.get_tile_by_handle(tile_var.handle)
+                    a = self.try_get_tile_by_handle(tile_var.handle)
                     if a is None:
                         raise Unreachable
 
@@ -853,11 +865,7 @@ class TileGrid:
         )
 
     def get_ys(self) -> set[int]:
-        return set(
-            itertools.chain(
-                *((t.c1.y, t.c2.y) for t in (t.as_corners() for t in self.get_tiles()))
-            )
-        )
+        return get_ys(self.get_tiles())
 
     def un_occupy(self, area: "Tile", /, *, prefer: "Orientation") -> "TileGrid | None":
         tiles: list[Tile] = []
@@ -876,13 +884,10 @@ class TileGrid:
 
     def snap_2_edges(
         self, handle_1: IntHandle, handle_2: IntHandle, *, proximity: int = 1
-    ) -> "TileGrid":
+    ) -> "TileGrid | None":
 
         tile_1 = self.get_tile_by_handle(handle_1)
         tile_2 = self.get_tile_by_handle(handle_2)
-
-        if (tile_1 is None) or (tile_2 is None):
-            raise Exception
 
         t1 = tile_1.as_corners()
         t2 = tile_2.as_corners()
@@ -898,7 +903,7 @@ class TileGrid:
         if not ok(t1, t2):
             return self
 
-        self.un_occupy(
+        result = self.un_occupy(
             Tile.build(
                 TileAsCorners(
                     t2.c2 + Cell(1, 0),
@@ -907,8 +912,59 @@ class TileGrid:
             ),
             prefer=Orientation.VERTICAL,
         )
+        if result is None:
+            return None
+
+        # t2_new = t2
 
         raise NotImplementedError
+
+    def get_uninterrupted_vertical_right_border(
+        self, handle: IntHandle
+    ) -> tuple[set[Tile], set[Tile]]:
+        tile = self.get_tile_by_handle(handle)
+        tc = tile.as_corners()
+        tiles = self.get_tiles()
+
+        possible_left = [t for t in tiles if tc.c2.x == t.as_corners().c2.x]
+        possible_right = [t for t in tiles if tc.c2.x + 1 == t.as_corners().c1.x]
+
+        if not possible_right:
+            return (set(possible_left), set())
+
+        y_min: int = tc.c1.y
+        y_max: int = tc.c2.y
+
+        left_and_right_swapped: bool = False
+        tiles_left: set[Tile] = {tile}
+        tiles_right: set[Tile] = set()
+        while True:
+            detector = Tile.build(
+                TileAsCorners(
+                    Cell(x=tc.c2.x, y=y_min),
+                    Cell(x=tc.c2.x + 1, y=y_max),
+                )
+            )
+            for tile_right in possible_right:
+                if tile_right.intersection(detector) is not None:
+                    tiles_right.add(tile_right)
+
+            new_y_min = min(t.as_corners().c1.y for t in tiles_right)
+            new_y_max = max(t.as_corners().c2.y for t in tiles_right)
+
+            if (new_y_min, new_y_max) == (y_min, y_max):
+                break
+
+            y_min, y_max = new_y_min, new_y_max
+
+            tiles_left, tiles_right = tiles_right, tiles_left
+            possible_left, possible_right = possible_right, possible_left
+            left_and_right_swapped = not left_and_right_swapped
+
+        if left_and_right_swapped:
+            tiles_left, tiles_right = tiles_right, tiles_left
+
+        return tiles_left, tiles_right
 
 
 # Line {{{
