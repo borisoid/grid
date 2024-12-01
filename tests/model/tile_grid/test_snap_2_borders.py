@@ -1,4 +1,4 @@
-from grid.model import Cell, Tile, TileAsCorners, TileGrid
+from grid.model import Cell, Changed, Tile, TileAsCorners, TileGrid
 
 
 def test_1() -> None:
@@ -19,4 +19,4 @@ def test_1() -> None:
         ),
     )
 
-    assert g1.snap_2_borders(handle=1) == g2
+    assert g1.snap_2_borders(handle=1) == Changed(g2, changed=True)
