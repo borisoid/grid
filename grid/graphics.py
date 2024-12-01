@@ -88,7 +88,7 @@ def generate_handle() -> IntHandle:
 ORIGIN_HANDLE = generate_handle()
 
 
-def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
+def draw(*, tiles: Iterable[Tile], box_corners: Tile, font: pg.font.Font) -> None:
     screen.fill(BACKGROUND_COLOR)
 
     # Grid {{{
@@ -216,6 +216,17 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile) -> None:
 
     # }}} Tiles
 
+    for tile in tiles:
+        tile_as_step = tile.as_step()
+        text_surface = font.render(f"{tile.handle}", False, BLACK, WHITE)
+        screen.blit(
+            text_surface,
+            (
+                ((tile_as_step.cell.x * CELL_SIDE_LENGTH) + CELL_PADDING),
+                ((tile_as_step.cell.y * CELL_SIDE_LENGTH) + CELL_PADDING),
+            ),
+        )
+
     pg.display.flip()
 
 
@@ -247,6 +258,9 @@ class Mode(Enum):
 
 
 def start() -> None:
+    pg.font.init()
+    font = pg.font.SysFont("Hack", 25)
+
     # for _ in range(2):
     #     clock.tick(FPS)
     #     draw_grid_setup(tiles=TILES_NORMALIZED, box_corners=BOX_CORNERS)
@@ -350,6 +364,10 @@ def start() -> None:
                     case pg.K_e:
                         tile_grid = tile_grid.expand().centralize_origin()
 
+                    case pg.K_p:
+                        tile_grid = tile_grid.snap_borders(proximity=3).obj
+                        # tile_grid = tile_grid.snap_2_edges(handle=0, proximity=3).obj
+
                     case pg.K_s:
                         # tile_grid = tile_grid.resize(new_boundary=Cell(x=10, y=10))
                         tile_grid = tile_grid.resize_along_x(x_length_new=10)
@@ -420,7 +438,7 @@ def start() -> None:
         # }}} Logic
 
         # Draw {{{
-        draw(tiles=tiles_translated, box_corners=box_corners)
+        draw(tiles=tiles_translated, box_corners=box_corners, font=font)
         clock.tick(FPS)
         # }}} Draw
 

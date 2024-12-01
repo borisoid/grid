@@ -19,4 +19,4 @@ def test_1() -> None:
         ),
     )
 
-    assert g1.snap_2_edges(handle=1) == g2
+    assert g1.snap_2_borders(handle=1) == g2

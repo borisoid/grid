@@ -22,6 +22,12 @@ class Unreachable(Exception):
     pass
 
 
+@dataclasses.dataclass
+class Changed[T]:
+    obj: T
+    changed: bool
+
+
 class CardinalDirection(IntEnum):
     UP = 0
     RIGHT = 1
@@ -892,37 +898,53 @@ class TileGrid:
 
         return TileGrid.from_tiles(tiles)
 
-    def snap_edges(self, *, proximity: int = 1) -> "TileGrid":
-        # a = tuple(itertools.combinations(self.get_tiles(), 2))
-        # a += tuple(ts[::-1] for ts in a)
-        raise NotImplementedError
+    def snap_borders(self, *, proximity: int = 1) -> Changed["TileGrid"]:
+        assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
-    def snap_2_edges(
+        new = self
+        changed = False
+        for tile in self.get_tiles():
+            result = new.snap_2_borders(handle=tile.handle, proximity=proximity)
+            new = result.obj
+            if result.changed:
+                changed = True
+
+        return Changed(new, changed)
+
+    def snap_2_borders(
         self, *, handle: IntHandle, proximity: int = 1
-    ) -> "TileGrid | None":
+    ) -> Changed["TileGrid"]:
+        assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
-        tile_1 = self.get_tile_by_handle(handle)
-        tc1 = tile_1.as_corners()
+        tile = self.get_tile_by_handle(handle)
+        tc = tile.as_corners()
 
         max_x: int | None = None
         tile_2: Tile | None = None
         for t2 in self.get_tiles():
             tc2 = t2.as_corners()
-            if (tc2.c1.y == tc1.c2.y + 1) and (tc2.c2.x + proximity <= tc1.c2.x):
-                if (max_x is None) or (tc2.c2.x > max_x):
-                    max_x = tc2.c2.x
-                    tile_2 = t2
+            if (
+                (tc2.c1.y == tc.c2.y + 1)
+                and (tc.c2.x >= tc2.c2.x)
+                and ((tc.c2.x - tc2.c2.x) <= proximity)
+                and ((max_x is None) or (tc2.c2.x > max_x))
+            ):
+                max_x = tc2.c2.x
+                tile_2 = t2
 
         if tile_2 is None:
-            return None
+            return Changed(self, False)
 
-        delta_x = tc1.c2.x - tile_2.as_corners().c2.x
-        left, right = self.get_shortest_vertical_right_border(tile_2.handle)
-        return self.replace_tiles(
-            itertools.chain(
-                (t.corners_c2_add(Cell(delta_x, 0)) for t in left),
-                (t.corners_c1_add(Cell(delta_x, 0)) for t in right),
-            )
+        delta_x = tc.c2.x - tile_2.as_corners().c2.x
+        left, right = self.get_longest_vertical_right_border(tile_2.handle)
+        return Changed(
+            self.replace_tiles(
+                itertools.chain(
+                    (t.corners_c2_add(Cell(delta_x, 0)) for t in left),
+                    (t.corners_c1_add(Cell(delta_x, 0)) for t in right),
+                )
+            ),
+            True,
         )
 
     def get_shortest_vertical_right_border(
