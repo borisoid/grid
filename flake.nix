@@ -16,9 +16,20 @@
                     ppp.kiwisolver
                     ppp.pygame
 
+                    # ppp.mypy
+                    (ppp.mypy.overrideAttrs rec {
+                        pname = "mypy";
+                        version = "1.13.0";
+                        src = p.fetchFromGitHub {
+                            owner = "python";
+                            repo = "mypy";
+                            rev = "refs/tags/v${version}";
+                            hash = "sha256-P2Ozmj7/7QBmjlveHLsNdYgUAerg0qOoa8pO0iQc5os=";
+                        };
+                    })
+
                     ppp.pytest
                     ppp.typing-extensions
-                    ppp.mypy
                     ppp.black
                     ppp.isort
                 ]))
