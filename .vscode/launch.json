@@ -5,6 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Grid Module",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "grid"
+        },
+        {
             "name": "Grid",
             "type": "debugpy",
             "request": "launch",

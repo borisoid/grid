@@ -369,6 +369,7 @@ class Tile:
 
     def un_occupy(self, area: "Tile", /, *, prefer: "Orientation") -> "Tile | None":
         curr: "Tile | None" = self
+        assert curr is not None
 
         rotate = prefer == Orientation.VERTICAL
 
@@ -916,7 +917,7 @@ class TileGrid:
             return None
 
         delta_x = tc1.c2.x - tile_2.as_corners().c2.x
-        left, right = self.get_uninterrupted_vertical_right_border(tile_2.handle)
+        left, right = self.get_shortest_vertical_right_border(tile_2.handle)
         return self.replace_tiles(
             itertools.chain(
                 (t.corners_c2_add(Cell(delta_x, 0)) for t in left),
@@ -924,7 +925,7 @@ class TileGrid:
             )
         )
 
-    def get_uninterrupted_vertical_right_border(
+    def get_shortest_vertical_right_border(
         self, handle: IntHandle
     ) -> tuple[set[Tile], set[Tile]]:
         tile = self.get_tile_by_handle(handle)
@@ -970,6 +971,30 @@ class TileGrid:
             tiles_left, tiles_right = tiles_right, tiles_left
 
         return tiles_left, tiles_right
+
+    def get_longest_vertical_right_border(
+        self, handle: IntHandle
+    ) -> tuple[set[Tile], set[Tile]]:
+        left, right = self.get_shortest_vertical_right_border(handle)
+
+        while True:
+            a = min(left, key=lambda t: t.as_corners().c1.y)
+            b = max(left, key=lambda t: t.as_corners().c2.y)
+
+            break_ = True
+            for tile in self.get_tiles():
+                if (tile.corner_cells()[3] == (a.corner_cells()[1] + Cell(0, -1))) or (
+                    tile.corner_cells()[1] == (b.corner_cells()[3] + Cell(0, 1))
+                ):
+                    break_ = False
+                    left_right = self.get_shortest_vertical_right_border(tile.handle)
+                    left.update(left_right[0])
+                    right.update(left_right[1])
+
+            if break_:
+                break
+
+        return left, right
 
 
 # Line {{{
