@@ -364,9 +364,9 @@ def start() -> None:
                     case pg.K_e:
                         tile_grid = tile_grid.expand().centralize_origin()
 
-                    case pg.K_p:
-                        tile_grid = tile_grid.snap_borders(proximity=3).obj
-                        # tile_grid = tile_grid.snap_2_edges(handle=0, proximity=3).obj
+                    case pg.K_a:
+                        tile_grid = tile_grid.align_borders(proximity=3)
+                        # tile_grid = tile_grid.snap_2_edges(handle=0, proximity=3)
 
                     case pg.K_s:
                         # tile_grid = tile_grid.resize(new_boundary=Cell(x=10, y=10))

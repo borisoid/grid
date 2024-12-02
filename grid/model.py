@@ -898,22 +898,40 @@ class TileGrid:
 
         return TileGrid.from_tiles(tiles)
 
-    def snap_borders(self, *, proximity: int = 1) -> Changed["TileGrid"]:
+    def align_borders(self, *, proximity: int = 1) -> "TileGrid":
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
-        new = self
-        changed = False
+        return (
+            self.align_right_borders(proximity=proximity)
+            .mirror_horizontally()
+            .align_right_borders(proximity=proximity)
+            .mirror_vertically()
+            .align_right_borders(proximity=proximity)
+            .mirror_horizontally()
+            .align_right_borders(proximity=proximity)
+            .mirror_vertically()
+            .rotate_clockwise()
+            .align_right_borders(proximity=proximity)
+            .mirror_horizontally()
+            .align_right_borders(proximity=proximity)
+            .mirror_vertically()
+            .align_right_borders(proximity=proximity)
+            .mirror_horizontally()
+            .align_right_borders(proximity=proximity)
+            .mirror_vertically()
+            .rotate_counterclockwise()
+        )
+
+    def align_right_borders(self, *, proximity: int = 1) -> "TileGrid":
+        assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
+
+        curr = self
         for tile in self.get_tiles():
-            result = new.snap_2_borders(handle=tile.handle, proximity=proximity)
-            new = result.obj
-            if result.changed:
-                changed = True
+            curr = curr.align_below_tile_right_border(handle=tile.handle, proximity=proximity)
 
-        return Changed(new, changed)
+        return curr
 
-    def snap_2_borders(
-        self, *, handle: IntHandle, proximity: int = 1
-    ) -> Changed["TileGrid"]:
+    def align_below_tile_right_border(self, *, handle: IntHandle, proximity: int = 1) -> "TileGrid":
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
         tile = self.get_tile_by_handle(handle)
@@ -933,18 +951,15 @@ class TileGrid:
                 tile_2 = t2
 
         if tile_2 is None:
-            return Changed(self, False)
+            return self
 
         delta_x = tc.c2.x - tile_2.as_corners().c2.x
         left, right = self.get_longest_vertical_right_border(tile_2.handle)
-        return Changed(
-            self.replace_tiles(
-                itertools.chain(
-                    (t.corners_c2_add(Cell(delta_x, 0)) for t in left),
-                    (t.corners_c1_add(Cell(delta_x, 0)) for t in right),
-                )
-            ),
-            True,
+        return self.replace_tiles(
+            itertools.chain(
+                (t.corners_c2_add(Cell(delta_x, 0)) for t in left),
+                (t.corners_c1_add(Cell(delta_x, 0)) for t in right),
+            )
         )
 
     def get_shortest_vertical_right_border(
