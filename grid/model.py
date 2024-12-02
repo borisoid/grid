@@ -902,36 +902,36 @@ class TileGrid:
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
         return (
-            self.align_right_borders(proximity=proximity)
+            self.align_right_borders_to_right(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders(proximity=proximity)
+            .align_right_borders_to_right(proximity=proximity)
             .mirror_vertically()
-            .align_right_borders(proximity=proximity)
+            .align_right_borders_to_right(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders(proximity=proximity)
+            .align_right_borders_to_right(proximity=proximity)
             .mirror_vertically()
             .rotate_clockwise()
-            .align_right_borders(proximity=proximity)
+            .align_right_borders_to_right(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders(proximity=proximity)
+            .align_right_borders_to_right(proximity=proximity)
             .mirror_vertically()
-            .align_right_borders(proximity=proximity)
+            .align_right_borders_to_right(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders(proximity=proximity)
+            .align_right_borders_to_right(proximity=proximity)
             .mirror_vertically()
             .rotate_counterclockwise()
         )
 
-    def align_right_borders(self, *, proximity: int = 1) -> "TileGrid":
+    def align_right_borders_to_right(self, *, proximity: int = 1) -> "TileGrid":
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
         curr = self
         for tile in self.get_tiles():
-            curr = curr.align_below_tile_right_border(handle=tile.handle, proximity=proximity)
+            curr = curr.align_below_tile_right_border_to_right(handle=tile.handle, proximity=proximity)
 
         return curr
 
-    def align_below_tile_right_border(self, *, handle: IntHandle, proximity: int = 1) -> "TileGrid":
+    def align_below_tile_right_border_to_right(self, *, handle: IntHandle, proximity: int = 1) -> "TileGrid":
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
         tile = self.get_tile_by_handle(handle)

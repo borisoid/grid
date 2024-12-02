@@ -19,4 +19,4 @@ def test_1() -> None:
         ),
     )
 
-    assert g1.align_below_tile_right_border(handle=1) == g2
+    assert g1.align_below_tile_right_border_to_right(handle=1) == g2
