@@ -234,7 +234,7 @@ def translate_tile(tile: Tile) -> Tile:
     corners = tile.as_corners()
 
     delta = Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
-    return tile.keep_handle(
+    return tile.replace_tile(
         TileAsCorners(
             c1=corners.c1 + delta,
             c2=corners.c2 + delta,
@@ -315,14 +315,15 @@ def start() -> None:
     # )
 
     ORIGINAL_TILE_GRID = tile_grid = TileGrid(
-        origin=Tile.build(
-            TileAsCorners(
-                c1=Cell(x=0, y=0),
-                c2=Cell(x=20, y=20),
+        (
+            Tile.build(
+                TileAsCorners(
+                    c1=Cell(x=0, y=0),
+                    c2=Cell(x=20, y=20),
+                ),
+                handle=ORIGIN_HANDLE,
             ),
-            handle=ORIGIN_HANDLE,
-        ),
-        other=(),
+        )
     )
 
     mode = Mode.NORMAL
@@ -391,8 +392,7 @@ def start() -> None:
 
                 selected_tile: Tile | None = None
                 for tile_translated in (
-                    translate_tile(tile)
-                    for tile in tile_grid.centralize_origin().get_tiles()
+                    translate_tile(tile) for tile in tile_grid.centralize_origin().tiles
                 ):
                     if tile_translated.contains_cell(
                         Cell(x=x // CELL_SIDE_LENGTH, y=y // CELL_SIDE_LENGTH)
@@ -432,7 +432,7 @@ def start() -> None:
 
         # Logic {{{
         tiles_translated = [
-            translate_tile(tile) for tile in tile_grid.centralize_origin().get_tiles()
+            translate_tile(tile) for tile in tile_grid.centralize_origin().tiles
         ]
         box_corners = get_box(tiles_translated)
         # }}} Logic
