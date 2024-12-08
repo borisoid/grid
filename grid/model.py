@@ -18,7 +18,15 @@ from typing import Iterable, Literal, NewType
 from kiwisolver import Expression, Solver, Variable
 
 
-class Unreachable(Exception):
+class GridModelException(Exception):
+    pass
+
+
+class Unreachable(GridModelException):
+    pass
+
+
+class InvariantViolation(GridModelException):
     pass
 
 
@@ -237,6 +245,10 @@ class Tile:
             )
         )
 
+    def area(self) -> int:
+        s = self.as_span()
+        return s.span.x * s.span.y
+
     def corners_c1_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
         return self.replace_tile(TileAsCorners(c1=tc.c1 + cell, c2=tc.c2))
@@ -453,6 +465,22 @@ def get_ys(tiles: Iterable[Tile]) -> set[int]:
     )
 
 
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class TileGridInvariantErrorContainer:
+    handles: dict[IntHandle, int]
+    overlapping_tiles: tuple[tuple[Tile, Tile], ...]
+    area_mismatch: int
+
+    def has_errors(self) -> bool:
+        return any(
+            (
+                self.handles,
+                self.overlapping_tiles,
+                self.area_mismatch > 0,
+            )
+        )
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class TileGrid:
     tiles: tuple[Tile, ...]
@@ -497,9 +525,34 @@ class TileGrid:
             if count != 1
         }
 
-    def raise_if_handle_error(self) -> None:
-        if errors := self.get_handle_errors():
-            raise Exception(str(errors))
+    def get_overlapping_tile_pairs(self) -> tuple[tuple[Tile, Tile], ...]:
+        return_: list[tuple[Tile, Tile]] = []
+        for a, b in itertools.combinations(self.tiles, 2):
+            if a.intersects_with(b):
+                return_.append((a, b))
+
+        return tuple(return_)
+
+    def get_area_mismatch(self) -> int:
+        box_area = self.get_box().area()
+
+        tiles_area = 0
+        for tile in self.tiles:
+            tiles_area += tile.area()
+
+        return box_area - tiles_area
+
+    def get_invariant_errors(self) -> TileGridInvariantErrorContainer:
+        return TileGridInvariantErrorContainer(
+            handles=self.get_handle_errors(),
+            overlapping_tiles=self.get_overlapping_tile_pairs(),
+            area_mismatch=self.get_area_mismatch(),
+        )
+
+    def assert_invariants(self) -> None:
+        invariant_errors = self.get_invariant_errors()
+        if invariant_errors.has_errors():
+            raise InvariantViolation(f"{invariant_errors=}")
 
     def rotate_clockwise(self) -> "TileGrid":
         return TileGrid.from_(x.rotate_clockwise() for x in self.tiles)
@@ -531,7 +584,9 @@ class TileGrid:
         box = self.get_box()
 
         for line in itertools.chain(
-            sorted(box.shred_horizontally(), key=lambda ln: ln.coordinate, reverse=True),
+            sorted(
+                box.shred_horizontally(), key=lambda ln: ln.coordinate, reverse=True
+            ),
             sorted(box.shred_vertically(), key=lambda ln: ln.coordinate, reverse=True),
         ):
             delta = {
@@ -764,7 +819,7 @@ class TileGrid:
         self, *, x_length_new: int, mode: Literal["balance", "scale"] = "scale"
     ) -> "TileGrid":
 
-        self.raise_if_handle_error()
+        self.assert_invariants()
 
         @dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
         class TileVar:
