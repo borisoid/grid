@@ -457,9 +457,6 @@ def get_ys(tiles: Iterable[Tile]) -> set[int]:
 class TileGrid:
     tiles: tuple[Tile, ...]
 
-    # origin: Tile
-    # other: tuple[Tile, ...]
-
     @staticmethod
     def from_(tiles: Iterable[Tile]) -> "TileGrid":
         return TileGrid(tuple(tiles))
@@ -945,6 +942,7 @@ class TileGrid:
             if (
                 (tc2.c1.y == tc.c2.y + 1)
                 and (tc.c2.x >= tc2.c2.x)
+                and (tc.c1.x <= tc2.c2.x)
                 and ((tc.c2.x - tc2.c2.x) <= proximity)
                 and ((max_x is None) or (tc2.c2.x > max_x))
             ):

@@ -359,7 +359,7 @@ def start() -> None:
                         tile_grid = tile_grid.expand().centralize_origin()
                         tile_grid = tile_grid.compact().centralize_origin()
 
-                    case pg.K_c:
+                    case pg.K_m:  # Minimize
                         tile_grid = tile_grid.compact().centralize_origin()
 
                     case pg.K_e:
@@ -376,6 +376,11 @@ def start() -> None:
                     case pg.K_r:
                         tile_grid = ORIGINAL_TILE_GRID
 
+                    case pg.K_p:
+                        print()
+                        print(repr(tile_grid))
+                        print()
+
                     case pg.K_z:
                         tile_grid = (
                             tile_grid.rotate_counterclockwise().centralize_origin()
@@ -383,6 +388,11 @@ def start() -> None:
 
                     case pg.K_x:
                         tile_grid = tile_grid.rotate_clockwise().centralize_origin()
+
+                    case pg.K_c:
+                        tile_grid = tile_grid.mirror_horizontally().centralize_origin()
+                    case pg.K_v:
+                        tile_grid = tile_grid.mirror_vertically().centralize_origin()
 
                     case _:
                         pass

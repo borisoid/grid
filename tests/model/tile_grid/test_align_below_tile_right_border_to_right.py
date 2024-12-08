@@ -16,3 +16,25 @@ def test_1() -> None:
     )
 
     assert g1.align_below_tile_right_border_to_right(handle=1) == g2
+
+
+def test_2() -> None:
+    g1 = TileGrid.tuple_(
+        Tile.build(TileAsCorners(c1=Cell(x=10, y=0), c2=Cell(x=20, y=10)), handle=0),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=10), c2=Cell(x=9, y=12)), handle=1),
+        Tile.build(TileAsCorners(c1=Cell(x=10, y=11), c2=Cell(x=20, y=20)), handle=2),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=0), c2=Cell(x=9, y=9)), handle=3),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=16), c2=Cell(x=9, y=20)), handle=4),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=13), c2=Cell(x=9, y=15)), handle=5),
+    )
+
+    g2 = TileGrid.tuple_(
+        Tile.build(TileAsCorners(c1=Cell(x=10, y=0), c2=Cell(x=20, y=9)), handle=0),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=10), c2=Cell(x=9, y=12)), handle=1),
+        Tile.build(TileAsCorners(c1=Cell(x=10, y=10), c2=Cell(x=20, y=20)), handle=2),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=0), c2=Cell(x=9, y=9)), handle=3),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=16), c2=Cell(x=9, y=20)), handle=4),
+        Tile.build(TileAsCorners(c1=Cell(x=0, y=13), c2=Cell(x=9, y=15)), handle=5),
+    )
+
+    assert g1.align_borders(proximity=3) == g2
