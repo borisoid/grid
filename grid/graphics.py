@@ -1,7 +1,7 @@
 import itertools
 import sys
 from enum import Enum
-from typing import Generator, Iterable
+from typing import Generator
 
 import pygame as pg
 
@@ -50,6 +50,7 @@ GREEN_50 = pg.Color(0, 50, 0)
 BLUE = pg.Color(0, 0, 255)
 BLUE_150 = pg.Color(0, 0, 150)
 BLUE_50 = pg.Color(0, 0, 50)
+BLUE_VSCODE = pg.Color(0, 119, 211)
 
 YELLOW = pg.Color(255, 255, 0)
 
@@ -88,7 +89,14 @@ def generate_handle() -> IntHandle:
 ORIGIN_HANDLE = generate_handle()
 
 
-def draw(*, tiles: Iterable[Tile], box_corners: Tile, font: pg.font.Font) -> None:
+def draw(
+    *, tile_grid: TileGrid, font: pg.font.Font, mouse_position: tuple[int, int], border_mode: "BorderMode"
+) -> None:
+    tile_grid = TileGrid.from_(translate_tile(tile) for tile in tile_grid.tiles)
+
+    tiles = tile_grid.tiles
+    box_corners = tile_grid.get_box()
+
     screen.fill(BACKGROUND_COLOR)
 
     # Grid {{{
@@ -216,6 +224,48 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile, font: pg.font.Font) -> Non
 
     # }}} Tiles
 
+    cursor_cell = Cell(
+        x=mouse_position[0] // CELL_SIDE_LENGTH,
+        y=mouse_position[1] // CELL_SIDE_LENGTH,
+    )
+
+    tile = tile_grid.try_get_tile_by_cell(cursor_cell)
+
+    def draw_border() -> None:
+        if tile is None:
+            return
+
+        match border_mode:
+            case BorderMode.SHORTEST:
+                border = tile_grid.get_shortest_vertical_right_border(tile.handle)
+            case BorderMode.LONGEST:
+                border = tile_grid.get_longest_vertical_right_border(tile.handle)
+
+        if not border[1]:
+            return
+
+        corner_cells = get_box(border[1]).corner_cells()
+        border_cells = corner_cells[0], corner_cells[2]
+
+        pg.draw.line(
+            surface=screen,
+            color=BLUE_VSCODE,
+            start_pos=(border_cells[0].x * CELL_SIDE_LENGTH, border_cells[0].y * CELL_SIDE_LENGTH),
+            end_pos=(border_cells[1].x * CELL_SIDE_LENGTH, (border_cells[1].y + 1) * CELL_SIDE_LENGTH),
+            width=8,
+        )
+
+    draw_border()
+
+    pg.draw.rect(
+        surface=screen,
+        color=RED,
+        rect=pg.Rect(
+            cursor_cell.x * CELL_SIDE_LENGTH, cursor_cell.y * CELL_SIDE_LENGTH, 5, 5
+        ),
+    )
+
+    # Handles {{{
     for tile in tiles:
         tile_as_step = tile.as_step()
         text_surface = font.render(f"{tile.handle}", False, BLACK, WHITE)
@@ -226,8 +276,13 @@ def draw(*, tiles: Iterable[Tile], box_corners: Tile, font: pg.font.Font) -> Non
                 ((tile_as_step.cell.y * CELL_SIDE_LENGTH) + CELL_PADDING),
             ),
         )
+    # }}} Handles
 
     pg.display.flip()
+
+
+def translate_cell(cell: Cell) -> Cell:
+    return cell + Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
 
 
 def translate_tile(tile: Tile) -> Tile:
@@ -255,6 +310,11 @@ class Mode(Enum):
     SPLIT_DOWN = "SPLIT_DOWN"
     SPLIT_LEFT = "SPLIT_LEFT"
     SPLIT_RIGHT = "SPLIT_RIGHT"
+
+
+class BorderMode(Enum):
+    SHORTEST = "SHORTEST"
+    LONGEST = "LONGEST"
 
 
 def start() -> None:
@@ -326,6 +386,8 @@ def start() -> None:
         )
     )
 
+    border_mode = BorderMode.SHORTEST
+
     mode = Mode.NORMAL
     mode_next = mode
     while True:
@@ -394,6 +456,15 @@ def start() -> None:
                     case pg.K_v:
                         tile_grid = tile_grid.mirror_vertically().centralize_origin()
 
+                    case pg.K_b:
+                        match border_mode:
+                            case BorderMode.SHORTEST:
+                                border_mode = BorderMode.LONGEST
+                            case BorderMode.LONGEST:
+                                border_mode = BorderMode.SHORTEST
+
+                        print(f"Border Mode: {border_mode.value}")
+
                     case _:
                         pass
 
@@ -441,14 +512,11 @@ def start() -> None:
             print(f"Mode: {mode.value}")
 
         # Logic {{{
-        tiles_translated = [
-            translate_tile(tile) for tile in tile_grid.centralize_origin().tiles
-        ]
-        box_corners = get_box(tiles_translated)
+        tile_grid = tile_grid.centralize_origin()
         # }}} Logic
 
         # Draw {{{
-        draw(tiles=tiles_translated, box_corners=box_corners, font=font)
+        draw(tile_grid=tile_grid, font=font, mouse_position=pg.mouse.get_pos(), border_mode=border_mode)
         clock.tick(FPS)
         # }}} Draw
 

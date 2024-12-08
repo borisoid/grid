@@ -511,6 +511,13 @@ class TileGrid:
             raise ValueError
         return return_
 
+    def try_get_tile_by_cell(self, cell: Cell) -> Tile | None:
+        for tile in self.tiles:
+            if tile.contains_cell(cell):
+                return tile
+
+        return None
+
     def replace_tiles(self, new: Iterable[Tile]) -> "TileGrid":
         new_ = {t.handle: t for t in new}
         return TileGrid.from_(new_.get(tile.handle, tile) for tile in self.tiles)
