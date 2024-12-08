@@ -34,6 +34,7 @@
                     ppp.isort
                 ]))
                 p.pyright
+                p.ruff
 
                 p.stdenv
                 p.stdenv.cc.cc.lib

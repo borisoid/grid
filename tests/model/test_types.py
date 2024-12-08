@@ -14,3 +14,7 @@ def test_mypy() -> None:
 
 def test_pyright() -> None:
     subprocess.check_call(["pyright", ".", "--pythonpath", sys.executable])
+
+
+def test_ruff() -> None:
+    subprocess.check_call(["ruff", "check"])

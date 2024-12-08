@@ -534,8 +534,8 @@ class TileGrid:
         box = self.get_box()
 
         for line in itertools.chain(
-            sorted(box.shred_horizontally(), key=lambda l: l.coordinate, reverse=True),
-            sorted(box.shred_vertically(), key=lambda l: l.coordinate, reverse=True),
+            sorted(box.shred_horizontally(), key=lambda ln: ln.coordinate, reverse=True),
+            sorted(box.shred_vertically(), key=lambda ln: ln.coordinate, reverse=True),
         ):
             delta = {
                 Orientation.HORIZONTAL: Cell(x=0, y=-1),
