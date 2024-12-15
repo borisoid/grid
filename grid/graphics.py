@@ -6,6 +6,7 @@ from typing import Generator
 import pygame as pg
 
 from .model import (
+    BorderMode,
     CardinalDirection,
     Cell,
     IntHandle,
@@ -90,7 +91,11 @@ ORIGIN_HANDLE = generate_handle()
 
 
 def draw(
-    *, tile_grid: TileGrid, font: pg.font.Font, mouse_position: tuple[int, int], border_mode: "BorderMode"
+    *,
+    tile_grid: TileGrid,
+    font: pg.font.Font,
+    mouse_position: tuple[int, int],
+    border_mode: BorderMode,
 ) -> None:
     tile_grid = TileGrid.from_(translate_tile(tile) for tile in tile_grid.tiles)
 
@@ -201,7 +206,7 @@ def draw(
         if tile.handle == ORIGIN_HANDLE:
             pg.draw.rect(
                 surface=screen,
-                color=YELLOW,
+                color=BLACK,
                 rect=pg.Rect(
                     (
                         (tile_as_step.cell.x * CELL_SIDE_LENGTH)
@@ -224,46 +229,76 @@ def draw(
 
     # }}} Tiles
 
+    # Cursor {{{
     cursor_cell = Cell(
         x=mouse_position[0] // CELL_SIDE_LENGTH,
         y=mouse_position[1] // CELL_SIDE_LENGTH,
     )
 
-    tile = tile_grid.try_get_tile_by_cell(cursor_cell)
+    pg.draw.rect(
+        surface=screen,
+        color=YELLOW,
+        rect=pg.Rect(
+            cursor_cell.x * CELL_SIDE_LENGTH, cursor_cell.y * CELL_SIDE_LENGTH, 5, 5
+        ),
+    )
+    # }}} Cursor
 
-    def draw_border() -> None:
-        if tile is None:
+    # Borders {{{
+
+    lr, tb = tile_grid.get_shared_borders_near(
+        cursor_cell, proximity=2, mode=border_mode
+    ).pull_coords(tile_grid)
+
+    def draw_right() -> None:
+        tiles = lr.rb
+        if not tiles:
             return
 
-        match border_mode:
-            case BorderMode.SHORTEST:
-                border = tile_grid.get_shortest_vertical_right_border(tile.handle)
-            case BorderMode.LONGEST:
-                border = tile_grid.get_longest_vertical_right_border(tile.handle)
-
-        if not border[1]:
-            return
-
-        corner_cells = get_box(border[1]).corner_cells()
+        corner_cells = get_box(tiles).corner_cells()
         border_cells = corner_cells[0], corner_cells[2]
 
         pg.draw.line(
             surface=screen,
             color=BLUE_VSCODE,
-            start_pos=(border_cells[0].x * CELL_SIDE_LENGTH, border_cells[0].y * CELL_SIDE_LENGTH),
-            end_pos=(border_cells[1].x * CELL_SIDE_LENGTH, (border_cells[1].y + 1) * CELL_SIDE_LENGTH),
+            start_pos=(
+                border_cells[0].x * CELL_SIDE_LENGTH,
+                border_cells[0].y * CELL_SIDE_LENGTH,
+            ),
+            end_pos=(
+                border_cells[1].x * CELL_SIDE_LENGTH,
+                (border_cells[1].y + 1) * CELL_SIDE_LENGTH,
+            ),
             width=8,
         )
 
-    draw_border()
+    draw_right()
 
-    pg.draw.rect(
-        surface=screen,
-        color=RED,
-        rect=pg.Rect(
-            cursor_cell.x * CELL_SIDE_LENGTH, cursor_cell.y * CELL_SIDE_LENGTH, 5, 5
-        ),
-    )
+    def draw_bottom() -> None:
+        tiles = tb.rb
+        if not tiles:
+            return
+
+        corner_cells = get_box(tiles).corner_cells()
+        border_cells = corner_cells[0], corner_cells[1]
+
+        pg.draw.line(
+            surface=screen,
+            color=BLUE_VSCODE,
+            start_pos=(
+                border_cells[0].x * CELL_SIDE_LENGTH,
+                border_cells[0].y * CELL_SIDE_LENGTH,
+            ),
+            end_pos=(
+                (border_cells[1].x + 1) * CELL_SIDE_LENGTH,
+                border_cells[1].y * CELL_SIDE_LENGTH,
+            ),
+            width=8,
+        )
+
+    draw_bottom()
+
+    # }}} Borders
 
     # Handles {{{
     for tile in tiles:
@@ -310,11 +345,6 @@ class Mode(Enum):
     SPLIT_DOWN = "SPLIT_DOWN"
     SPLIT_LEFT = "SPLIT_LEFT"
     SPLIT_RIGHT = "SPLIT_RIGHT"
-
-
-class BorderMode(Enum):
-    SHORTEST = "SHORTEST"
-    LONGEST = "LONGEST"
 
 
 def start() -> None:
@@ -463,7 +493,7 @@ def start() -> None:
                             case BorderMode.LONGEST:
                                 border_mode = BorderMode.SHORTEST
 
-                        print(f"Border Mode: {border_mode.value}")
+                        print(border_mode)
 
                     case _:
                         pass
@@ -516,7 +546,12 @@ def start() -> None:
         # }}} Logic
 
         # Draw {{{
-        draw(tile_grid=tile_grid, font=font, mouse_position=pg.mouse.get_pos(), border_mode=border_mode)
+        draw(
+            tile_grid=tile_grid,
+            font=font,
+            mouse_position=pg.mouse.get_pos(),
+            border_mode=border_mode,
+        )
         clock.tick(FPS)
         # }}} Draw
 

@@ -13,7 +13,7 @@ import itertools
 from collections import Counter, defaultdict
 from enum import Enum, IntEnum, auto
 from types import MappingProxyType
-from typing import Iterable, Literal, NewType
+from typing import Iterable, Literal, NamedTuple, NewType
 
 from kiwisolver import Expression, Solver, Variable
 
@@ -479,6 +479,71 @@ class TileGridInvariantErrorContainer:
                 self.area_mismatch > 0,
             )
         )
+
+
+class BorderMode(Enum):
+    SHORTEST = auto()
+    LONGEST = auto()
+
+
+class SharedBorderHandles(NamedTuple):
+    lt: set[IntHandle]
+    rb: set[IntHandle]
+
+    @staticmethod
+    def empty() -> "SharedBorderHandles":
+        return SharedBorderHandles(set(), set())
+
+    def pull_coords(self, grid: "TileGrid") -> "SharedBorder":
+        return SharedBorder(
+            lt={tile for tile in grid.tiles if tile.handle in self.lt},
+            rb={tile for tile in grid.tiles if tile.handle in self.rb},
+        )
+
+
+class SharedBordersHandles(NamedTuple):
+    lr: SharedBorderHandles
+    tb: SharedBorderHandles
+
+    @staticmethod
+    def empty() -> "SharedBordersHandles":
+        return SharedBordersHandles(
+            SharedBorderHandles.empty(),
+            SharedBorderHandles.empty(),
+        )
+
+    def pull_coords(self, grid: "TileGrid") -> "SharedBorders":
+        return SharedBorders(
+            lr=self.lr.pull_coords(grid),
+            tb=self.tb.pull_coords(grid),
+        )
+
+
+class SharedBorder(NamedTuple):
+    lt: set[Tile]
+    rb: set[Tile]
+
+    @staticmethod
+    def empty() -> "SharedBorder":
+        return SharedBorder(set(), set())
+
+    def handles(self) -> SharedBorderHandles:
+        return SharedBorderHandles(
+            lt={tile.handle for tile in self.lt},
+            rb={tile.handle for tile in self.rb},
+        )
+
+
+class SharedBorders(NamedTuple):
+    lr: SharedBorder
+    tb: SharedBorder
+
+    @staticmethod
+    def empty() -> "SharedBorders":
+        return SharedBorders(SharedBorder.empty(), SharedBorder.empty())
+
+    def handles(self) -> "SharedBordersHandles":
+        return SharedBordersHandles(self.lr.handles(), self.tb.handles())
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1023,9 +1088,16 @@ class TileGrid:
             )
         )
 
-    def get_shortest_vertical_right_border(
-        self, handle: IntHandle
-    ) -> tuple[set[Tile], set[Tile]]:
+    def get_vertical_right_border(
+        self, handle: IntHandle, *, mode: BorderMode
+    ) -> SharedBorder:
+        match mode:
+            case BorderMode.SHORTEST:
+                return self.get_shortest_vertical_right_border(handle)
+            case BorderMode.LONGEST:
+                return self.get_longest_vertical_right_border(handle)
+
+    def get_shortest_vertical_right_border(self, handle: IntHandle) -> SharedBorder:
         tile = self.get_tile_by_handle(handle)
         tc = tile.as_corners()
         tiles = self.tiles
@@ -1034,7 +1106,7 @@ class TileGrid:
         possible_right = [t for t in tiles if tc.c2.x + 1 == t.as_corners().c1.x]
 
         if not possible_right:
-            return (set(possible_left), set())
+            return SharedBorder(set(possible_left), set())
 
         y_min: int = tc.c1.y
         y_max: int = tc.c2.y
@@ -1068,11 +1140,9 @@ class TileGrid:
         if left_and_right_swapped:
             tiles_left, tiles_right = tiles_right, tiles_left
 
-        return tiles_left, tiles_right
+        return SharedBorder(tiles_left, tiles_right)
 
-    def get_longest_vertical_right_border(
-        self, handle: IntHandle
-    ) -> tuple[set[Tile], set[Tile]]:
+    def get_longest_vertical_right_border(self, handle: IntHandle) -> SharedBorder:
         left, right = self.get_shortest_vertical_right_border(handle)
 
         while True:
@@ -1092,7 +1162,69 @@ class TileGrid:
             if break_:
                 break
 
-        return left, right
+        return SharedBorder(left, right)
+
+    def get_shared_borders_near(
+        self, cell: Cell, *, proximity: int = 1, mode: BorderMode
+    ) -> SharedBordersHandles:
+        tile = self.try_get_tile_by_cell(cell)
+        if tile is None:
+            return SharedBordersHandles.empty()
+
+        grid = self
+        cc = tile.corner_cells()
+
+        closest_edge = closest(
+            to=cell.x, out_of=(cc[0].x, cc[1].x + 1), proximity=proximity
+        )
+        if closest_edge is None:
+            vertical_borders = SharedBorderHandles.empty()
+        elif cell.x < closest_edge:
+            vertical_borders = grid.get_vertical_right_border(
+                tile.handle, mode=mode
+            ).handles()
+        else:
+            new_tile = grid.try_get_tile_by_cell(Cell(cc[0].x - 1, cell.y))
+            if new_tile is None:
+                vertical_borders = SharedBorderHandles.empty()
+            else:
+                vertical_borders = grid.get_vertical_right_border(
+                    new_tile.handle, mode=mode
+                ).handles()
+
+        cell = cell.rotate_counterclockwise()
+        tile = tile.rotate_counterclockwise()
+        grid = grid.rotate_counterclockwise()
+        cc = tile.corner_cells()
+
+        closest_edge = closest(
+            to=cell.x, out_of=(cc[0].x, cc[1].x + 1), proximity=proximity
+        )
+        if closest_edge is None:
+            horizontal_borders = SharedBorderHandles.empty()
+        elif cell.x < closest_edge:
+            horizontal_borders = grid.get_vertical_right_border(
+                tile.handle, mode=mode
+            ).handles()
+        else:
+            new_tile = grid.try_get_tile_by_cell(Cell(cc[0].x - 1, cell.y))
+            if new_tile is None:
+                horizontal_borders = SharedBorderHandles.empty()
+            else:
+                horizontal_borders = grid.get_vertical_right_border(
+                    new_tile.handle, mode=mode
+                ).handles()
+
+        return SharedBordersHandles(lr=vertical_borders, tb=horizontal_borders)
+
+
+def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
+    number, distance = min(
+        ((n, abs(n - to)) for n in out_of),
+        key=lambda a: a[1],
+    )
+
+    return None if distance > proximity else number
 
 
 # Line {{{
