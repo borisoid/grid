@@ -526,17 +526,36 @@ class SharedBorders:
             },
         )
 
-    def as_tiles(self) -> tuple[Tile, Tile]:
+    def as_tiles(self) -> tuple[Tile | None, Tile | None]:
         """
         Return: (vertical, horizontal)
         """
         return (
-            Tile.from_cells(
-                itertools.chain(*(tile.corner_cells()[0:3:2] for tile in self.right))
+            (
+                Tile.from_cells(
+                    itertools.chain(
+                        *(tile.corner_cells()[0:3:2] for tile in self.right)
+                    )
+                )
+                if self.right
+                else None
             ),
-            Tile.from_cells(
-                itertools.chain(*(tile.corner_cells()[0:2] for tile in self.bottom))
+            (
+                Tile.from_cells(
+                    itertools.chain(*(tile.corner_cells()[0:2] for tile in self.bottom))
+                )
+                if self.bottom
+                else None
             ),
+        )
+
+    def union(self, other: "SharedBorders") -> "SharedBorders":
+        # TODO: Make it respect only handles
+        return SharedBorders(
+            left=self.left.union(other.left),
+            right=self.right.union(other.right),
+            top=self.top.union(other.top),
+            bottom=self.bottom.union(other.bottom),
         )
 
 
@@ -1159,7 +1178,12 @@ class TileGrid:
         return SharedBorders(left=shared_borders.left, right=shared_borders.right)
 
     def get_shared_borders_near(
-        self, cell: Cell, *, proximity: int = 1, mode: BorderMode
+        self,
+        cell: Cell,
+        *,
+        proximity: int = 1,
+        mode: BorderMode,
+        ignore_plus: bool = False,
     ) -> SharedBorders:
         tile = self.try_get_tile_by_cell(cell)
         if tile is None:
@@ -1205,13 +1229,44 @@ class TileGrid:
                     new_tile.handle, mode=mode
                 )
 
-        return SharedBorders(
+        shared_borders = SharedBorders(
             left=vertical_borders.left,
             right=vertical_borders.right,
             # Rotated counterclockwise before
             top=horizontal_borders.left,
             bottom=horizontal_borders.right,
         ).pull_coords(self)
+
+        if ignore_plus or (mode == BorderMode.LONGEST):
+            return shared_borders
+
+        vertical, horizontal = shared_borders.as_tiles()
+        if (vertical is None) or (horizontal is None):
+            return shared_borders
+
+        vertical = vertical.corners_c2_add(Cell(0, 1))
+        horizontal = horizontal.corners_c2_add(Cell(1, 0))
+
+        v1, v2 = vertical.corner_cells()[0:3:2]
+        h1, h2 = horizontal.corner_cells()[0:2]
+
+        if not (v1 == h1 or v1 == h2 or v2 == h1 or v2 == h2):
+            return shared_borders
+
+        delta = Cell(
+            x=-1 if h1 in (v1, v2) else 1,
+            y=-1 if v1 in (h1, h2) else 1,
+        )
+
+        intersection = vertical.intersection(horizontal)
+        if intersection is None:
+            raise Unreachable
+
+        new_base_cell = intersection.as_corners().c1 + delta
+
+        return self.get_shared_borders_near(
+            new_base_cell, proximity=proximity, mode=BorderMode.SHORTEST, ignore_plus=True
+        ).union(shared_borders)
 
 
 def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
