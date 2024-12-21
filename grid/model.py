@@ -13,7 +13,8 @@ import itertools
 from collections import Counter, defaultdict
 from enum import Enum, IntEnum, auto
 from types import MappingProxyType
-from typing import Iterable, Literal, NamedTuple, NewType
+from typing import Iterable, Literal, NewType
+from dataclasses import dataclass, field
 
 from kiwisolver import Expression, Solver, Variable
 
@@ -30,7 +31,7 @@ class InvariantViolation(GridModelException):
     pass
 
 
-@dataclasses.dataclass
+@dataclass
 class Changed[T]:
     obj: T
     changed: bool
@@ -71,7 +72,7 @@ grid_section_inverse = MappingProxyType(
 )
 
 
-@dataclasses.dataclass(frozen=True, slots=True, eq=True)
+@dataclass(frozen=True, slots=True, eq=True)
 class Cell:
     x: int
     y: int
@@ -114,7 +115,7 @@ class Cell:
         return Cell(x=self.x, y=-self.y)
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class TileAsSpan:
     cell: Cell
     span: Cell
@@ -126,7 +127,7 @@ class TileAsSpan:
         ).normalize()
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class TileAsStep:
     cell: Cell
     step: Cell
@@ -138,7 +139,7 @@ class TileAsStep:
         ).normalize()
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class TileAsCorners:
     c1: Cell
     c2: Cell
@@ -195,7 +196,7 @@ assert delta.y >= 0
 type IntHandle = int
 
 
-@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Tile:
     tile: TileAsCornersNormalized
     handle: IntHandle
@@ -465,7 +466,7 @@ def get_ys(tiles: Iterable[Tile]) -> set[int]:
     )
 
 
-@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TileGridInvariantErrorContainer:
     handles: dict[IntHandle, int]
     overlapping_tiles: tuple[tuple[Tile, Tile], ...]
@@ -486,67 +487,51 @@ class BorderMode(Enum):
     LONGEST = auto()
 
 
-class SharedBorderHandles(NamedTuple):
-    lt: set[IntHandle]
-    rb: set[IntHandle]
-
-    @staticmethod
-    def empty() -> "SharedBorderHandles":
-        return SharedBorderHandles(set(), set())
-
-    def pull_coords(self, grid: "TileGrid") -> "SharedBorder":
-        return SharedBorder(
-            lt={tile for tile in grid.tiles if tile.handle in self.lt},
-            rb={tile for tile in grid.tiles if tile.handle in self.rb},
-        )
-
-
-class SharedBordersHandles(NamedTuple):
-    lr: SharedBorderHandles
-    tb: SharedBorderHandles
+@dataclass
+class SharedBordersHandles:
+    left: set[IntHandle] = field(default_factory=set)
+    right: set[IntHandle] = field(default_factory=set)
+    top: set[IntHandle] = field(default_factory=set)
+    bottom: set[IntHandle] = field(default_factory=set)
 
     @staticmethod
     def empty() -> "SharedBordersHandles":
-        return SharedBordersHandles(
-            SharedBorderHandles.empty(),
-            SharedBorderHandles.empty(),
-        )
+        return SharedBordersHandles(set(), set(), set(), set())
 
     def pull_coords(self, grid: "TileGrid") -> "SharedBorders":
         return SharedBorders(
-            lr=self.lr.pull_coords(grid),
-            tb=self.tb.pull_coords(grid),
+            left={tile for tile in grid.tiles if tile.handle in self.left},
+            right={tile for tile in grid.tiles if tile.handle in self.right},
+            top={tile for tile in grid.tiles if tile.handle in self.top},
+            bottom={tile for tile in grid.tiles if tile.handle in self.bottom},
         )
 
 
-class SharedBorder(NamedTuple):
-    lt: set[Tile]
-    rb: set[Tile]
-
-    @staticmethod
-    def empty() -> "SharedBorder":
-        return SharedBorder(set(), set())
-
-    def handles(self) -> SharedBorderHandles:
-        return SharedBorderHandles(
-            lt={tile.handle for tile in self.lt},
-            rb={tile.handle for tile in self.rb},
-        )
-
-
-class SharedBorders(NamedTuple):
-    lr: SharedBorder
-    tb: SharedBorder
+@dataclass(slots=True)
+class SharedBorders:
+    left: set[Tile] = field(default_factory=set)
+    right: set[Tile] = field(default_factory=set)
+    top: set[Tile] = field(default_factory=set)
+    bottom: set[Tile] = field(default_factory=set)
 
     @staticmethod
     def empty() -> "SharedBorders":
-        return SharedBorders(SharedBorder.empty(), SharedBorder.empty())
+        return SharedBorders(set(), set(), set(), set())
 
-    def handles(self) -> "SharedBordersHandles":
-        return SharedBordersHandles(self.lr.handles(), self.tb.handles())
+    def handles(self) -> SharedBordersHandles:
+        return SharedBordersHandles(
+            left={t.handle for t in self.left},
+            right={t.handle for t in self.right},
+            top={t.handle for t in self.top},
+            bottom={t.handle for t in self.bottom},
+        )
+
+    def check(self) -> None:
+        # TODO: Check if all edges align
+        raise NotImplementedError
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class TileGrid:
     tiles: tuple[Tile, ...]
 
@@ -893,7 +878,7 @@ class TileGrid:
 
         self.assert_invariants()
 
-        @dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+        @dataclass(frozen=True, slots=True, kw_only=True)
         class TileVar:
             cell_x: Variable
             span_x: Variable
@@ -1080,24 +1065,24 @@ class TileGrid:
             return self
 
         delta_x = tc.c2.x - tile_2.as_corners().c2.x
-        left, right = self.get_longest_vertical_right_border(tile_2.handle)
+        shared_borders = self.get_longest_vertical_right_border(tile_2.handle)
         return self.replace_tiles(
             itertools.chain(
-                (t.corners_c2_add(Cell(delta_x, 0)) for t in left),
-                (t.corners_c1_add(Cell(delta_x, 0)) for t in right),
+                (t.corners_c2_add(Cell(delta_x, 0)) for t in shared_borders.left),
+                (t.corners_c1_add(Cell(delta_x, 0)) for t in shared_borders.right),
             )
         )
 
     def get_vertical_right_border(
         self, handle: IntHandle, *, mode: BorderMode
-    ) -> SharedBorder:
+    ) -> SharedBorders:
         match mode:
             case BorderMode.SHORTEST:
                 return self.get_shortest_vertical_right_border(handle)
             case BorderMode.LONGEST:
                 return self.get_longest_vertical_right_border(handle)
 
-    def get_shortest_vertical_right_border(self, handle: IntHandle) -> SharedBorder:
+    def get_shortest_vertical_right_border(self, handle: IntHandle) -> SharedBorders:
         tile = self.get_tile_by_handle(handle)
         tc = tile.as_corners()
         tiles = self.tiles
@@ -1106,7 +1091,7 @@ class TileGrid:
         possible_right = [t for t in tiles if tc.c2.x + 1 == t.as_corners().c1.x]
 
         if not possible_right:
-            return SharedBorder(set(possible_left), set())
+            return SharedBorders(left=set(possible_left), right=set())
 
         y_min: int = tc.c1.y
         y_max: int = tc.c2.y
@@ -1140,14 +1125,14 @@ class TileGrid:
         if left_and_right_swapped:
             tiles_left, tiles_right = tiles_right, tiles_left
 
-        return SharedBorder(tiles_left, tiles_right)
+        return SharedBorders(left=tiles_left, right=tiles_right)
 
-    def get_longest_vertical_right_border(self, handle: IntHandle) -> SharedBorder:
-        left, right = self.get_shortest_vertical_right_border(handle)
+    def get_longest_vertical_right_border(self, handle: IntHandle) -> SharedBorders:
+        shared_borders = self.get_shortest_vertical_right_border(handle)
 
         while True:
-            a = min(left, key=lambda t: t.as_corners().c1.y)
-            b = max(left, key=lambda t: t.as_corners().c2.y)
+            a = min(shared_borders.left, key=lambda t: t.as_corners().c1.y)
+            b = max(shared_borders.left, key=lambda t: t.as_corners().c2.y)
 
             break_ = True
             for tile in self.tiles:
@@ -1156,13 +1141,13 @@ class TileGrid:
                 ):
                     break_ = False
                     left_right = self.get_shortest_vertical_right_border(tile.handle)
-                    left.update(left_right[0])
-                    right.update(left_right[1])
+                    shared_borders.left.update(left_right.left)
+                    shared_borders.right.update(left_right.right)
 
             if break_:
                 break
 
-        return SharedBorder(left, right)
+        return SharedBorders(left=shared_borders.left, right=shared_borders.right)
 
     def get_shared_borders_near(
         self, cell: Cell, *, proximity: int = 1, mode: BorderMode
@@ -1178,7 +1163,7 @@ class TileGrid:
             to=cell.x, out_of=(cc[0].x, cc[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
-            vertical_borders = SharedBorderHandles.empty()
+            vertical_borders = SharedBordersHandles.empty()
         elif cell.x < closest_edge:
             vertical_borders = grid.get_vertical_right_border(
                 tile.handle, mode=mode
@@ -1186,7 +1171,7 @@ class TileGrid:
         else:
             new_tile = grid.try_get_tile_by_cell(Cell(cc[0].x - 1, cell.y))
             if new_tile is None:
-                vertical_borders = SharedBorderHandles.empty()
+                vertical_borders = SharedBordersHandles.empty()
             else:
                 vertical_borders = grid.get_vertical_right_border(
                     new_tile.handle, mode=mode
@@ -1201,7 +1186,7 @@ class TileGrid:
             to=cell.x, out_of=(cc[0].x, cc[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
-            horizontal_borders = SharedBorderHandles.empty()
+            horizontal_borders = SharedBordersHandles.empty()
         elif cell.x < closest_edge:
             horizontal_borders = grid.get_vertical_right_border(
                 tile.handle, mode=mode
@@ -1209,13 +1194,19 @@ class TileGrid:
         else:
             new_tile = grid.try_get_tile_by_cell(Cell(cc[0].x - 1, cell.y))
             if new_tile is None:
-                horizontal_borders = SharedBorderHandles.empty()
+                horizontal_borders = SharedBordersHandles.empty()
             else:
                 horizontal_borders = grid.get_vertical_right_border(
                     new_tile.handle, mode=mode
                 ).handles()
 
-        return SharedBordersHandles(lr=vertical_borders, tb=horizontal_borders)
+        return SharedBordersHandles(
+            left=vertical_borders.left,
+            right=vertical_borders.right,
+            # Rotated counterclockwise before
+            top=horizontal_borders.left,
+            bottom=horizontal_borders.right,
+        )
 
 
 def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
@@ -1242,7 +1233,7 @@ class Orientation(Enum):
         )
 
 
-@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Line:
     coordinate: int
     orientation: Orientation

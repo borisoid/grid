@@ -246,12 +246,12 @@ def draw(
 
     # Borders {{{
 
-    lr, tb = tile_grid.get_shared_borders_near(
+    shared_borders = tile_grid.get_shared_borders_near(
         cursor_cell, proximity=2, mode=border_mode
     ).pull_coords(tile_grid)
 
     def draw_right() -> None:
-        tiles = lr.rb
+        tiles = shared_borders.right
         if not tiles:
             return
 
@@ -275,7 +275,7 @@ def draw(
     draw_right()
 
     def draw_bottom() -> None:
-        tiles = tb.rb
+        tiles = shared_borders.bottom
         if not tiles:
             return
 
