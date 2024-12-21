@@ -487,26 +487,6 @@ class BorderMode(Enum):
     LONGEST = auto()
 
 
-@dataclass
-class SharedBordersHandles:
-    left: set[IntHandle] = field(default_factory=set)
-    right: set[IntHandle] = field(default_factory=set)
-    top: set[IntHandle] = field(default_factory=set)
-    bottom: set[IntHandle] = field(default_factory=set)
-
-    @staticmethod
-    def empty() -> "SharedBordersHandles":
-        return SharedBordersHandles(set(), set(), set(), set())
-
-    def pull_coords(self, grid: "TileGrid") -> "SharedBorders":
-        return SharedBorders(
-            left={tile for tile in grid.tiles if tile.handle in self.left},
-            right={tile for tile in grid.tiles if tile.handle in self.right},
-            top={tile for tile in grid.tiles if tile.handle in self.top},
-            bottom={tile for tile in grid.tiles if tile.handle in self.bottom},
-        )
-
-
 @dataclass(slots=True)
 class SharedBorders:
     left: set[Tile] = field(default_factory=set)
@@ -518,17 +498,46 @@ class SharedBorders:
     def empty() -> "SharedBorders":
         return SharedBorders(set(), set(), set(), set())
 
-    def handles(self) -> SharedBordersHandles:
-        return SharedBordersHandles(
-            left={t.handle for t in self.left},
-            right={t.handle for t in self.right},
-            top={t.handle for t in self.top},
-            bottom={t.handle for t in self.bottom},
-        )
-
     def check(self) -> None:
         # TODO: Check if all edges align
         raise NotImplementedError
+
+    def pull_coords(self, grid: "TileGrid") -> "SharedBorders":
+        return SharedBorders(
+            left={
+                tile
+                for tile in grid.tiles
+                if tile.handle in (t.handle for t in self.left)
+            },
+            right={
+                tile
+                for tile in grid.tiles
+                if tile.handle in (t.handle for t in self.right)
+            },
+            top={
+                tile
+                for tile in grid.tiles
+                if tile.handle in (t.handle for t in self.top)
+            },
+            bottom={
+                tile
+                for tile in grid.tiles
+                if tile.handle in (t.handle for t in self.bottom)
+            },
+        )
+
+    def as_tiles(self) -> tuple[Tile, Tile]:
+        """
+        Return: (vertical, horizontal)
+        """
+        return (
+            Tile.from_cells(
+                itertools.chain(*(tile.corner_cells()[0:3:2] for tile in self.right))
+            ),
+            Tile.from_cells(
+                itertools.chain(*(tile.corner_cells()[0:2] for tile in self.bottom))
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1151,10 +1160,10 @@ class TileGrid:
 
     def get_shared_borders_near(
         self, cell: Cell, *, proximity: int = 1, mode: BorderMode
-    ) -> SharedBordersHandles:
+    ) -> SharedBorders:
         tile = self.try_get_tile_by_cell(cell)
         if tile is None:
-            return SharedBordersHandles.empty()
+            return SharedBorders.empty()
 
         grid = self
         cc = tile.corner_cells()
@@ -1163,19 +1172,17 @@ class TileGrid:
             to=cell.x, out_of=(cc[0].x, cc[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
-            vertical_borders = SharedBordersHandles.empty()
+            vertical_borders = SharedBorders.empty()
         elif cell.x < closest_edge:
-            vertical_borders = grid.get_vertical_right_border(
-                tile.handle, mode=mode
-            ).handles()
+            vertical_borders = grid.get_vertical_right_border(tile.handle, mode=mode)
         else:
             new_tile = grid.try_get_tile_by_cell(Cell(cc[0].x - 1, cell.y))
             if new_tile is None:
-                vertical_borders = SharedBordersHandles.empty()
+                vertical_borders = SharedBorders.empty()
             else:
                 vertical_borders = grid.get_vertical_right_border(
                     new_tile.handle, mode=mode
-                ).handles()
+                )
 
         cell = cell.rotate_counterclockwise()
         tile = tile.rotate_counterclockwise()
@@ -1186,27 +1193,25 @@ class TileGrid:
             to=cell.x, out_of=(cc[0].x, cc[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
-            horizontal_borders = SharedBordersHandles.empty()
+            horizontal_borders = SharedBorders.empty()
         elif cell.x < closest_edge:
-            horizontal_borders = grid.get_vertical_right_border(
-                tile.handle, mode=mode
-            ).handles()
+            horizontal_borders = grid.get_vertical_right_border(tile.handle, mode=mode)
         else:
             new_tile = grid.try_get_tile_by_cell(Cell(cc[0].x - 1, cell.y))
             if new_tile is None:
-                horizontal_borders = SharedBordersHandles.empty()
+                horizontal_borders = SharedBorders.empty()
             else:
                 horizontal_borders = grid.get_vertical_right_border(
                     new_tile.handle, mode=mode
-                ).handles()
+                )
 
-        return SharedBordersHandles(
+        return SharedBorders(
             left=vertical_borders.left,
             right=vertical_borders.right,
             # Rotated counterclockwise before
             top=horizontal_borders.left,
             bottom=horizontal_borders.right,
-        )
+        ).pull_coords(self)
 
 
 def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
