@@ -562,6 +562,37 @@ class SharedBorders:
             bottom=self.bottom.union(other.bottom),
         )
 
+    def rotate(
+        self, side: CardinalDirection, /, *, to: CardinalDirection
+    ) -> "SharedBorders":
+        match (to - side) % 4:
+            case 0:
+                return self
+            case 1:
+                return self.rotate_clockwise()
+            case 2:
+                return self.rotate_clockwise().rotate_clockwise()
+            case 3:
+                return self.rotate_counterclockwise()
+            case _:
+                raise Unreachable
+
+    def rotate_clockwise(self) -> "SharedBorders":
+        return SharedBorders(
+            left=frozenset(tile.rotate_clockwise() for tile in self.bottom),
+            right=frozenset(tile.rotate_clockwise() for tile in self.top),
+            top=frozenset(tile.rotate_clockwise() for tile in self.left),
+            bottom=frozenset(tile.rotate_clockwise() for tile in self.right),
+        )
+
+    def rotate_counterclockwise(self) -> "SharedBorders":
+        return SharedBorders(
+            left=frozenset(tile.rotate_clockwise() for tile in self.top),
+            right=frozenset(tile.rotate_clockwise() for tile in self.bottom),
+            top=frozenset(tile.rotate_clockwise() for tile in self.right),
+            bottom=frozenset(tile.rotate_clockwise() for tile in self.left),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class TileGrid:

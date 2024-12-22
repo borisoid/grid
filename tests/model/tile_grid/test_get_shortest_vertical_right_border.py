@@ -10,7 +10,9 @@ def test_1() -> None:
     t3 = Tile.build(TileAsCorners(Cell(6, 0), Cell(10, 10)))
     g = TileGrid((t1, t2, t3))
 
-    assert g.get_shortest_vertical_right_border(1) == SharedBorders({t1, t2}, {t3})
+    assert g.get_shortest_vertical_right_border(1) == SharedBorders(
+        frozenset({t1, t2}), frozenset({t3})
+    )
 
 
 def test_2() -> None:
@@ -23,7 +25,9 @@ def test_2() -> None:
     t4 = Tile.build(TileAsCorners(Cell(6, 6), Cell(10, 10)))
     g = TileGrid((t1, t2, t3, t4))
 
-    assert g.get_shortest_vertical_right_border(1) == SharedBorders({t1}, {t3})
+    assert g.get_shortest_vertical_right_border(1) == SharedBorders(
+        frozenset({t1}), frozenset({t3})
+    )
 
 
 def test_3() -> None:
@@ -36,7 +40,9 @@ def test_3() -> None:
     t4 = Tile.build(TileAsCorners(Cell(6, 7), Cell(10, 10)))
     g = TileGrid((t1, t2, t3, t4))
 
-    assert g.get_shortest_vertical_right_border(1) == SharedBorders({t1, t2}, {t3, t4})
+    assert g.get_shortest_vertical_right_border(1) == SharedBorders(
+        frozenset({t1, t2}), frozenset({t3, t4})
+    )
 
 
 def test_4() -> None:
@@ -52,7 +58,7 @@ def test_4() -> None:
     g = TileGrid((t1, t2, t3, t4, t5, t6))
 
     assert g.get_shortest_vertical_right_border(1) == SharedBorders(
-        {t1, t2}, {t3, t4, t5}
+        frozenset({t1, t2}), frozenset({t3, t4, t5})
     )
 
 
@@ -69,7 +75,7 @@ def test_5() -> None:
     g = TileGrid((t1, t2, t3, t4, t5, t6))
 
     assert g.get_shortest_vertical_right_border(1) == SharedBorders(
-        {t1, t2}, {t3, t4, t5}
+        frozenset({t1, t2}), frozenset({t3, t4, t5})
     )
 
 
@@ -86,5 +92,5 @@ def test_6() -> None:
     g = TileGrid((t1, t2, t3, t4, t5, t6))
 
     assert g.get_shortest_vertical_right_border(1) == SharedBorders(
-        {t3, t4, t5, t6}, set()
+        frozenset({t3, t4, t5, t6}), frozenset()
     )
