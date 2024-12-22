@@ -4,7 +4,11 @@ Coordinates:
 |
 +Y
 
-
+Direction precedence (From most to least significant):
+From LEFT to RIGHT
+Along X
+From TOP to BOTTOM
+Along Y
 """
 
 import dataclasses
@@ -14,7 +18,7 @@ from collections import Counter, defaultdict
 from enum import Enum, IntEnum, auto
 from types import MappingProxyType
 from typing import Iterable, Literal, NewType
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from kiwisolver import Expression, Solver, Variable
 
@@ -487,16 +491,16 @@ class BorderMode(Enum):
     LONGEST = auto()
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class SharedBorders:
-    left: set[Tile] = field(default_factory=set)
-    right: set[Tile] = field(default_factory=set)
-    top: set[Tile] = field(default_factory=set)
-    bottom: set[Tile] = field(default_factory=set)
+    left: frozenset[Tile] = frozenset()
+    right: frozenset[Tile] = frozenset()
+    top: frozenset[Tile] = frozenset()
+    bottom: frozenset[Tile] = frozenset()
 
     @staticmethod
     def empty() -> "SharedBorders":
-        return SharedBorders(set(), set(), set(), set())
+        return SharedBorders(frozenset(), frozenset(), frozenset(), frozenset())
 
     def check(self) -> None:
         # TODO: Check if all edges align
@@ -504,26 +508,26 @@ class SharedBorders:
 
     def pull_coords(self, grid: "TileGrid") -> "SharedBorders":
         return SharedBorders(
-            left={
+            left=frozenset(
                 tile
                 for tile in grid.tiles
                 if tile.handle in (t.handle for t in self.left)
-            },
-            right={
+            ),
+            right=frozenset(
                 tile
                 for tile in grid.tiles
                 if tile.handle in (t.handle for t in self.right)
-            },
-            top={
+            ),
+            top=frozenset(
                 tile
                 for tile in grid.tiles
                 if tile.handle in (t.handle for t in self.top)
-            },
-            bottom={
+            ),
+            bottom=frozenset(
                 tile
                 for tile in grid.tiles
                 if tile.handle in (t.handle for t in self.bottom)
-            },
+            ),
         )
 
     def as_tiles(self) -> tuple[Tile | None, Tile | None]:
@@ -1119,7 +1123,7 @@ class TileGrid:
         possible_right = [t for t in tiles if tc.c2.x + 1 == t.as_corners().c1.x]
 
         if not possible_right:
-            return SharedBorders(left=set(possible_left), right=set())
+            return SharedBorders(left=frozenset(possible_left), right=frozenset())
 
         y_min: int = tc.c1.y
         y_max: int = tc.c2.y
@@ -1153,7 +1157,7 @@ class TileGrid:
         if left_and_right_swapped:
             tiles_left, tiles_right = tiles_right, tiles_left
 
-        return SharedBorders(left=tiles_left, right=tiles_right)
+        return SharedBorders(left=frozenset(tiles_left), right=frozenset(tiles_right))
 
     def get_longest_vertical_right_border(self, handle: IntHandle) -> SharedBorders:
         shared_borders = self.get_shortest_vertical_right_border(handle)
@@ -1169,8 +1173,10 @@ class TileGrid:
                 ):
                     break_ = False
                     left_right = self.get_shortest_vertical_right_border(tile.handle)
-                    shared_borders.left.update(left_right.left)
-                    shared_borders.right.update(left_right.right)
+                    shared_borders = SharedBorders(
+                        left=shared_borders.left | left_right.left,
+                        right=shared_borders.right | left_right.right,
+                    )
 
             if break_:
                 break
@@ -1265,7 +1271,10 @@ class TileGrid:
         new_base_cell = intersection.as_corners().c1 + delta
 
         return self.get_shared_borders_near(
-            new_base_cell, proximity=proximity, mode=BorderMode.SHORTEST, ignore_plus=True
+            new_base_cell,
+            proximity=proximity,
+            mode=BorderMode.SHORTEST,
+            ignore_plus=True,
         ).union(shared_borders)
 
 
