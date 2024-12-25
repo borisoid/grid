@@ -16,6 +16,7 @@ import functools
 import itertools
 from collections import Counter, defaultdict
 from enum import Enum, IntEnum, auto
+import math
 from types import MappingProxyType
 from typing import Iterable, Literal, NewType
 from dataclasses import dataclass
@@ -1132,6 +1133,37 @@ class TileGrid:
             itertools.chain(
                 (t.corners_c2_add(Cell(delta_x, 0)) for t in shared_borders.left),
                 (t.corners_c1_add(Cell(delta_x, 0)) for t in shared_borders.right),
+            )
+        )
+
+    def drag_borders(self, *, borders: SharedBorders, delta: Cell) -> None:
+        new_grid_no_snaps = (
+            self.drag_vertical_border_along_x(borders=borders, delta=delta.x)
+            .rotate_counterclockwise()
+            .drag_vertical_border_along_x(
+                borders=borders.rotate_counterclockwise(), delta=delta.y
+            )
+            .rotate_clockwise()
+        )
+
+        # TODO: Snap
+
+    def drag_vertical_border_along_x(
+        self, *, borders: SharedBorders, delta: int
+    ) -> "TileGrid":
+        if (delta == 0) or (len(borders.left) == 0) or (len(borders.right) == 0):
+            return self
+
+        tiles_to_check_width = borders.left if delta < 0 else borders.right
+        min_width = min(tile.as_span().span.x for tile in tiles_to_check_width)
+
+        if abs(delta) >= min_width:
+            delta = int(math.copysign((min_width - 1), delta))
+
+        return self.replace_tiles(
+            itertools.chain(
+                (t.corners_c2_add(Cell(delta, 0)) for t in borders.left),
+                (t.corners_c1_add(Cell(delta, 0)) for t in borders.right),
             )
         )
 
