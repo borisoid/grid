@@ -606,6 +606,9 @@ class TileGrid:
 
         return TileGrid(tuple(tiles) + tiles_)
 
+    def get_handle_tile_map(self) -> dict[IntHandle, Tile]:
+        return {tile.handle: tile for tile in self.tiles}
+
     def get_box(self) -> Tile:
         return get_box(self.tiles)
 
@@ -1164,6 +1167,91 @@ class TileGrid:
             itertools.chain(
                 (t.corners_c2_add(Cell(delta, 0)) for t in borders.left),
                 (t.corners_c1_add(Cell(delta, 0)) for t in borders.right),
+            )
+        )
+
+    def snap_vertical_border(
+        self, border: SharedBorders, *, proximity: int = 1
+    ) -> "TileGrid":
+        border_tile = border.as_tiles()[0]
+        if border_tile is None:
+            return self
+
+        min_width_left = min(tile.as_span().span.x for tile in border.left)
+        max_delta_left = min(proximity, min_width_left - 1)
+
+        min_width_right = min(tile.as_span().span.x for tile in border.right)
+        max_delta_right = min(proximity, min_width_right - 1)
+
+        bc = border_tile.as_corners()  # bc = border corners
+
+        def get_closest_snap_delta(
+            *, ref_cell: Cell, delta: Cell, max_delta: int, sign: Literal[1, -1]
+        ) -> int | None:
+            # TODO: The larger the scale and proximity the worse. I can do
+            # this by finding tiles intersecting some scanner tile and looking
+            # at their corners
+
+            ref_tile_1 = self.try_get_tile_by_cell(ref_cell)
+            if ref_tile_1 is None:
+                return None
+
+            for i in range(max_delta + 1):
+                ref_cell += delta
+
+                ref_tile_2 = self.try_get_tile_by_cell(ref_cell)
+                if ref_tile_2 is None:
+                    return None
+
+                if ref_tile_1.handle != ref_tile_2.handle:
+                    return i * sign
+
+            return None
+
+        closest_snap_delta_left_top = get_closest_snap_delta(
+            ref_cell=bc.c1 + Cell(0, -1),
+            delta=Cell(-1, 0),
+            max_delta=max_delta_left,
+            sign=-1,
+        )
+        closest_snap_delta_left_bottom = get_closest_snap_delta(
+            ref_cell=bc.c2 + Cell(0, 1),
+            delta=Cell(-1, 0),
+            max_delta=max_delta_left,
+            sign=-1,
+        )
+        closest_snap_delta_right_top = get_closest_snap_delta(
+            ref_cell=bc.c1 + Cell(-1, -1),
+            delta=Cell(1, 0),
+            max_delta=max_delta_right,
+            sign=1,
+        )
+        closest_snap_delta_right_bottom = get_closest_snap_delta(
+            ref_cell=bc.c2 + Cell(-1, 1),
+            delta=Cell(1, 0),
+            max_delta=max_delta_right,
+            sign=1,
+        )
+
+        delta_x = min(
+            (
+                x
+                for x in (
+                    closest_snap_delta_left_top,
+                    closest_snap_delta_left_bottom,
+                    closest_snap_delta_right_top,
+                    closest_snap_delta_right_bottom,
+                )
+                if x is not None
+            ),
+            key=abs,
+            default=0,
+        )
+
+        return self.replace_tiles(
+            itertools.chain(
+                (t.corners_c2_add(Cell(delta_x, 0)) for t in border.left),
+                (t.corners_c1_add(Cell(delta_x, 0)) for t in border.right),
             )
         )
 
