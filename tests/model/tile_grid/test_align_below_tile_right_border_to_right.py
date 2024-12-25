@@ -2,13 +2,13 @@ from grid.model import Cell, Tile, TileAsCorners, TileGrid
 
 
 def test_1() -> None:
-    g1 = TileGrid.tuple_(
+    g1 = TileGrid.from_(
         Tile.build(TileAsCorners(Cell(0, 0), Cell(5, 5)), handle=1),
         Tile.build(TileAsCorners(Cell(0, 6), Cell(4, 10)), handle=2),
         Tile.build(TileAsCorners(Cell(6, 0), Cell(10, 5)), handle=3),
         Tile.build(TileAsCorners(Cell(5, 6), Cell(10, 10)), handle=4),
     )
-    g2 = TileGrid.tuple_(
+    g2 = TileGrid.from_(
         Tile.build(TileAsCorners(Cell(0, 0), Cell(5, 5)), handle=1),
         Tile.build(TileAsCorners(Cell(0, 6), Cell(5, 10)), handle=2),
         Tile.build(TileAsCorners(Cell(6, 0), Cell(10, 5)), handle=3),
@@ -19,7 +19,7 @@ def test_1() -> None:
 
 
 def test_2() -> None:
-    g1 = TileGrid.tuple_(
+    g1 = TileGrid.from_(
         Tile.build(TileAsCorners(c1=Cell(x=10, y=0), c2=Cell(x=20, y=10)), handle=0),
         Tile.build(TileAsCorners(c1=Cell(x=0, y=10), c2=Cell(x=9, y=12)), handle=1),
         Tile.build(TileAsCorners(c1=Cell(x=10, y=11), c2=Cell(x=20, y=20)), handle=2),
@@ -28,7 +28,7 @@ def test_2() -> None:
         Tile.build(TileAsCorners(c1=Cell(x=0, y=13), c2=Cell(x=9, y=15)), handle=5),
     )
 
-    g2 = TileGrid.tuple_(
+    g2 = TileGrid.from_(
         Tile.build(TileAsCorners(c1=Cell(x=10, y=0), c2=Cell(x=20, y=9)), handle=0),
         Tile.build(TileAsCorners(c1=Cell(x=0, y=10), c2=Cell(x=9, y=12)), handle=1),
         Tile.build(TileAsCorners(c1=Cell(x=10, y=10), c2=Cell(x=20, y=20)), handle=2),

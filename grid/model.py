@@ -599,12 +599,11 @@ class TileGrid:
     tiles: tuple[Tile, ...]
 
     @staticmethod
-    def from_(tiles: Iterable[Tile]) -> "TileGrid":
-        return TileGrid(tuple(tiles))
+    def from_(tiles: Iterable[Tile] | Tile, *tiles_: Tile) -> "TileGrid":
+        if isinstance(tiles, Tile):
+            tiles = (tiles,)
 
-    @staticmethod
-    def tuple_(*tiles: Tile) -> "TileGrid":
-        return TileGrid(tiles)
+        return TileGrid(tuple(tiles) + tiles_)
 
     def get_box(self) -> Tile:
         return get_box(self.tiles)
