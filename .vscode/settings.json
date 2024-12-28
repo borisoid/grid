@@ -1,5 +1,8 @@
 {
-    "black-formatter.path": ["/usr/bin/black"],
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "mypy-type-checker.importStrategy": "fromEnvironment",
     "files.exclude": {
         "**/__pycache__": true,
         "**/.mypy_cache": true

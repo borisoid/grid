@@ -9,7 +9,7 @@ authors = [
     {name = "borisoid", email = "boris.lazarev90@mail.ru"},
 ]
 
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "pygame>=2.5.2",
     "kiwisolver>=1.4.5",
@@ -20,8 +20,7 @@ dev = [
     "pytest>=8.1.1",
     "mypy>=1.8.0",
     "pyright>=1.1.362",
-    "black>=24.3.0",
-    "isort>=5.13.2",
+    "ruff>=0.8.3",
 ]
 
 [tool.pytest.ini_options]
@@ -30,11 +29,8 @@ testpaths = [
 ]
 
 [tool.pyright]
-pythonVersion = "3.12"
+pythonVersion = "3.13"
 pythonPlatform = "Linux"
-exclude = [
-    "**/__pycache__",
-]
 strict = ["*"]
 reportWildcardImportFromLibrary = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
@@ -43,6 +39,11 @@ reportImplicitOverride = "error"
 reportUninitializedInstanceVariable = "error"
 reportTypeCommentUsage = "error"
 reportMatchNotExhaustive = "error"
+reportUnusedImport = "error"
+reportUnknownVariableType = "error"
+exclude = [
+    "**/__pycache__",
+]
 
 [tool.mypy]
 namespace_packages = true
@@ -50,17 +51,14 @@ explicit_package_bases = true
 disallow_untyped_defs = true
 pretty = true
 show_error_codes = true
+implicit_reexport = false
+warn_redundant_casts = true
+# warn_unused_ignores = true
+warn_return_any = true
 exclude = [
     "^local/.",
 ]
 
-[tool.isort]
-profile = "black"
-lines_after_imports = 2
-line_length = 88  # Default
-group_by_package = true
-ensure_newline_before_comments = true
-
-[tool.black]
-line-length = 88  # Default
-target-version = ['py312']
+[tool.ruff.lint.isort]
+combine-as-imports = true
+lines-after-imports = 2

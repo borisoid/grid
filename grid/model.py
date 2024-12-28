@@ -14,12 +14,13 @@ Along Y
 import dataclasses
 import functools
 import itertools
-from collections import Counter, defaultdict
-from enum import Enum, IntEnum, auto
 import math
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from enum import Enum, IntEnum, auto
 from types import MappingProxyType
 from typing import Iterable, Literal, NewType
-from dataclasses import dataclass
+from warnings import deprecated
 
 from kiwisolver import Expression, Solver, Variable
 
@@ -34,12 +35,6 @@ class Unreachable(GridModelException):
 
 class InvariantViolation(GridModelException):
     pass
-
-
-@dataclass
-class Changed[T]:
-    obj: T
-    changed: bool
 
 
 class CardinalDirection(IntEnum):
@@ -554,6 +549,13 @@ class SharedBorders:
             ),
         )
 
+    def get_box(self) -> Tile | None:
+        tiles = tuple(itertools.chain(self.left, self.right, self.top, self.bottom))
+        if not tiles:
+            return None
+
+        return get_box(tiles)
+
     def union(self, other: "SharedBorders") -> "SharedBorders":
         # TODO: Make it respect only handles
         return SharedBorders(
@@ -593,6 +595,41 @@ class SharedBorders:
             top=frozenset(tile.rotate_clockwise() for tile in self.right),
             bottom=frozenset(tile.rotate_clockwise() for tile in self.left),
         )
+
+    def mirror_horizontally(self) -> "SharedBorders":
+        return SharedBorders(
+            left=frozenset(tile.mirror_horizontally() for tile in self.right),
+            right=frozenset(tile.mirror_horizontally() for tile in self.left),
+            top=frozenset(tile.mirror_horizontally() for tile in self.top),
+            bottom=frozenset(tile.mirror_horizontally() for tile in self.bottom),
+        )
+
+    def mirror_vertically(self) -> "SharedBorders":
+        return SharedBorders(
+            left=frozenset(tile.mirror_vertically() for tile in self.left),
+            right=frozenset(tile.mirror_vertically() for tile in self.right),
+            top=frozenset(tile.mirror_vertically() for tile in self.bottom),
+            bottom=frozenset(tile.mirror_vertically() for tile in self.top),
+        )
+
+    def get_cross_cell(self) -> Cell | None:
+        vertical, horizontal = self.as_tiles()
+
+        if (vertical is None) and (horizontal is None):
+            return None
+
+        if (vertical is None) and (horizontal is not None):
+            return horizontal.as_corners().c1
+
+        if (vertical is not None) and (horizontal is None):
+            return vertical.as_corners().c1
+
+        if (vertical is not None) and (horizontal is not None):
+            intersection = vertical.intersection(horizontal)
+            assert intersection is not None
+            return intersection.as_corners().c1
+
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -941,7 +978,6 @@ class TileGrid:
     def resize_along_x(
         self, *, x_length_new: int, mode: Literal["balance", "scale"] = "scale"
     ) -> "TileGrid":
-
         self.assert_invariants()
 
         @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1139,11 +1175,12 @@ class TileGrid:
             )
         )
 
+    @deprecated("Inefficient")
     def drag_borders(self, *, borders: SharedBorders, delta: Cell) -> None:
-        new_grid_no_snaps = (
-            self.drag_vertical_border_along_x(borders=borders, delta=delta.x)
+        _new_grid_no_snaps = (
+            self.drag_vertical_border_along_x(borders=borders, delta=delta.x)  # type: ignore
             .rotate_counterclockwise()
-            .drag_vertical_border_along_x(
+            .drag_vertical_border_along_x(  # type: ignore
                 borders=borders.rotate_counterclockwise(), delta=delta.y
             )
             .rotate_clockwise()
@@ -1151,6 +1188,7 @@ class TileGrid:
 
         # TODO: Snap
 
+    @deprecated("Inefficient")
     def drag_vertical_border_along_x(
         self, *, borders: SharedBorders, delta: int
     ) -> "TileGrid":
@@ -1170,6 +1208,7 @@ class TileGrid:
             )
         )
 
+    @deprecated("Inefficient")
     def snap_vertical_border(
         self, border: SharedBorders, *, proximity: int = 1
     ) -> "TileGrid":
@@ -1254,6 +1293,50 @@ class TileGrid:
                 (t.corners_c1_add(Cell(delta_x, 0)) for t in border.right),
             )
         )
+
+    def get_snap_points(self, *, borders: SharedBorders) -> tuple[set[int], set[int]]:
+        """
+        Return: `(xs, ys)`
+        """
+        box = borders.get_box()
+        if box is None:
+            return (set(), set())
+
+        xs: set[int] = set()
+        xs.update(self.get_top_snap_points(borders=borders))
+        xs.update(
+            self.mirror_vertically().get_top_snap_points(
+                borders=borders.mirror_vertically()
+            )
+        )
+
+        self = self.rotate_counterclockwise()
+        borders = borders.rotate_counterclockwise()
+
+        ys: set[int] = set()
+        ys.update(self.get_top_snap_points(borders=borders))
+        ys.update(
+            self.mirror_vertically().get_top_snap_points(
+                borders=borders.mirror_vertically()
+            )
+        )
+
+        return (xs, ys)
+
+    def get_top_snap_points(self, *, borders: SharedBorders) -> set[int]:
+        box = borders.get_box()
+        if box is None:
+            return set()
+
+        bc = box.corner_cells()
+        detector = Tile.build(TileAsCorners(bc[0] + Cell(0, -1), bc[1] + Cell(0, -1)))
+
+        return_: set[int] = set()
+        for tile in self.tiles:
+            if intersection := detector.intersection(tile):
+                return_.add(intersection.as_corners().c1.x)
+
+        return return_
 
     def get_vertical_right_border(
         self, handle: IntHandle, *, mode: BorderMode
@@ -1426,6 +1509,50 @@ class TileGrid:
             mode=BorderMode.SHORTEST,
             ignore_plus=True,
         ).union(shared_borders)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BorderDragCache:
+    borders: SharedBorders
+    grid: TileGrid
+
+    snap_proximity: int
+    snap_points_x: frozenset[int]
+    snap_points_y: frozenset[int]
+
+    max_delta_left: int
+    max_delta_right: int
+    max_delta_top: int
+    max_delta_bottom: int
+
+    @staticmethod
+    def build(
+        *, borders: SharedBorders, grid: TileGrid, snap_proximity: int
+    ) -> "BorderDragCache":
+        min1 = functools.partial(min, default=1)
+        min_span_left = min1(tile.as_span().span.x for tile in borders.left)
+        min_span_right = min1(tile.as_span().span.x for tile in borders.right)
+        min_span_top = min1(tile.as_span().span.y for tile in borders.top)
+        min_span_bottom = min1(tile.as_span().span.y for tile in borders.bottom)
+
+        max_delta_left = min_span_left - 1
+        max_delta_right = min_span_right - 1
+        max_delta_top = min_span_top - 1
+        max_delta_bottom = min_span_bottom - 1
+
+        snap_points_x, snap_points_y = grid.get_snap_points(borders=borders)
+
+        return BorderDragCache(
+            borders=borders,
+            grid=grid,
+            snap_proximity=abs(snap_proximity),
+            snap_points_x=frozenset(snap_points_x),
+            snap_points_y=frozenset(snap_points_y),
+            max_delta_left=max_delta_left,
+            max_delta_right=max_delta_right,
+            max_delta_top=max_delta_top,
+            max_delta_bottom=max_delta_bottom,
+        )
 
 
 def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
