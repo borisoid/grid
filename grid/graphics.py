@@ -10,6 +10,7 @@ from .model import (
     CardinalDirection,
     Cell,
     IntHandle,
+    SharedBorders,
     Tile,
     TileAsCorners,
     TileGrid,
@@ -94,10 +95,12 @@ def draw(
     *,
     tile_grid: TileGrid,
     font: pg.font.Font,
-    mouse_position: tuple[int, int],
-    border_mode: BorderMode,
+    cursor_cell: Cell,
+    shared_borders: SharedBorders,
 ) -> None:
-    tile_grid = TileGrid.from_(translate_tile(tile) for tile in tile_grid.tiles)
+    tile_grid = TileGrid.from_(tile_to_window_space(tile) for tile in tile_grid.tiles)
+    cursor_cell = cell_to_window_space(cursor_cell)
+    shared_borders = shared_borders.pull_coords(tile_grid)
 
     tiles = tile_grid.tiles
     box_corners = tile_grid.get_box()
@@ -230,11 +233,6 @@ def draw(
     # }}} Tiles
 
     # Cursor {{{
-    cursor_cell = Cell(
-        x=mouse_position[0] // CELL_SIDE_LENGTH,
-        y=mouse_position[1] // CELL_SIDE_LENGTH,
-    )
-
     pg.draw.rect(
         surface=screen,
         color=YELLOW,
@@ -245,11 +243,6 @@ def draw(
     # }}} Cursor
 
     # Borders {{{
-
-    shared_borders = tile_grid.get_shared_borders_near(
-        cursor_cell, proximity=2, mode=border_mode
-    ).pull_coords(tile_grid)
-
     def draw_right() -> None:
         tiles = shared_borders.right
         if not tiles:
@@ -316,11 +309,15 @@ def draw(
     pg.display.flip()
 
 
-def translate_cell(cell: Cell) -> Cell:
+def cell_to_window_space(cell: Cell) -> Cell:
     return cell + Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
 
 
-def translate_tile(tile: Tile) -> Tile:
+def cell_from_window_space(cell: Cell) -> Cell:
+    return cell - Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
+
+
+def tile_to_window_space(tile: Tile) -> Tile:
     corners = tile.as_corners()
 
     delta = Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
@@ -418,8 +415,7 @@ def start() -> None:
 
     border_mode = BorderMode.SHORTEST
 
-    mode = Mode.NORMAL
-    mode_next = mode
+    mode: Mode = Mode.NORMAL
     while True:
         # Controls {{{
         for e in pg.event.get():
@@ -432,19 +428,25 @@ def start() -> None:
                         if mode == Mode.NORMAL:
                             sys.exit()
                         else:
-                            mode_next = Mode.NORMAL
+                            mode = Mode.NORMAL
+                            print(f"Mode: {mode.value}")
 
                     case pg.K_d:
-                        mode_next = Mode.DELETE
+                        mode = Mode.DELETE
+                        print(f"Mode: {mode.value}")
 
                     case pg.K_h:
-                        mode_next = Mode.SPLIT_LEFT
+                        mode = Mode.SPLIT_LEFT
+                        print(f"Mode: {mode.value}")
                     case pg.K_j:
-                        mode_next = Mode.SPLIT_DOWN
+                        mode = Mode.SPLIT_DOWN
+                        print(f"Mode: {mode.value}")
                     case pg.K_k:
-                        mode_next = Mode.SPLIT_UP
+                        mode = Mode.SPLIT_UP
+                        print(f"Mode: {mode.value}")
                     case pg.K_l:
-                        mode_next = Mode.SPLIT_RIGHT
+                        mode = Mode.SPLIT_RIGHT
+                        print(f"Mode: {mode.value}")
 
                     case pg.K_0:
                         tile_grid = tile_grid.compact().centralize_origin()
@@ -503,7 +505,8 @@ def start() -> None:
 
                 selected_tile: Tile | None = None
                 for tile_translated in (
-                    translate_tile(tile) for tile in tile_grid.centralize_origin().tiles
+                    tile_to_window_space(tile)
+                    for tile in tile_grid.centralize_origin().tiles
                 ):
                     if tile_translated.contains_cell(
                         Cell(x=x // CELL_SIDE_LENGTH, y=y // CELL_SIDE_LENGTH)
@@ -537,20 +540,28 @@ def start() -> None:
 
         # }}} Controls
 
-        if mode_next != mode:
-            mode = mode_next
-            print(f"Mode: {mode.value}")
-
         # Logic {{{
         tile_grid = tile_grid.centralize_origin()
+
+        mouse_position = pg.mouse.get_pos()
+        screen_cursor_cell = Cell(
+            x=mouse_position[0] // CELL_SIDE_LENGTH,
+            y=mouse_position[1] // CELL_SIDE_LENGTH,
+        )
+        cursor_cell = cell_from_window_space(screen_cursor_cell)
+
+        shared_borders = tile_grid.get_shared_borders_near(
+            cursor_cell, proximity=2, mode=border_mode
+        ).pull_coords(tile_grid)
+
         # }}} Logic
 
         # Draw {{{
         draw(
             tile_grid=tile_grid,
             font=font,
-            mouse_position=pg.mouse.get_pos(),
-            border_mode=border_mode,
+            cursor_cell=cursor_cell,
+            shared_borders=shared_borders,
         )
         clock.tick(FPS)
         # }}} Draw
