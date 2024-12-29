@@ -4,11 +4,6 @@ Coordinates:
 |
 +Y
 
-Direction precedence (From most to least significant):
-From LEFT to RIGHT
-Along X
-From TOP to BOTTOM
-Along Y
 """
 
 import dataclasses
@@ -537,14 +532,14 @@ class SharedBorders:
                         *(tile.corner_cells()[0:3:2] for tile in self.right)
                     )
                 )
-                if self.right
+                if self.right and self.left
                 else None
             ),
             (
                 Tile.from_cells(
                     itertools.chain(*(tile.corner_cells()[0:2] for tile in self.bottom))
                 )
-                if self.bottom
+                if self.bottom and self.top
                 else None
             ),
         )
@@ -1294,35 +1289,6 @@ class TileGrid:
             )
         )
 
-    def get_snap_points(self, *, borders: SharedBorders) -> tuple[set[int], set[int]]:
-        """
-        Return: `(xs, ys)`
-        """
-        box = borders.get_box()
-        if box is None:
-            return (set(), set())
-
-        xs: set[int] = set()
-        xs.update(self.get_top_snap_points(borders=borders))
-        xs.update(
-            self.mirror_vertically().get_top_snap_points(
-                borders=borders.mirror_vertically()
-            )
-        )
-
-        self = self.rotate_counterclockwise()
-        borders = borders.rotate_counterclockwise()
-
-        ys: set[int] = set()
-        ys.update(self.get_top_snap_points(borders=borders))
-        ys.update(
-            self.mirror_vertically().get_top_snap_points(
-                borders=borders.mirror_vertically()
-            )
-        )
-
-        return (xs, ys)
-
     def get_top_snap_points(self, *, borders: SharedBorders) -> set[int]:
         box = borders.get_box()
         if box is None:
@@ -1516,7 +1482,6 @@ class BorderDragCache:
     borders: SharedBorders
     grid: TileGrid
 
-    snap_proximity: int
     snap_points_x: frozenset[int]
     snap_points_y: frozenset[int]
 
@@ -1525,10 +1490,8 @@ class BorderDragCache:
     max_delta_top: int
     max_delta_bottom: int
 
-    @staticmethod
-    def build(
-        *, borders: SharedBorders, grid: TileGrid, snap_proximity: int
-    ) -> "BorderDragCache":
+    @classmethod
+    def build(cls, *, borders: SharedBorders, grid: TileGrid) -> "BorderDragCache":
         min1 = functools.partial(min, default=1)
         min_span_left = min1(tile.as_span().span.x for tile in borders.left)
         min_span_right = min1(tile.as_span().span.x for tile in borders.right)
@@ -1540,12 +1503,38 @@ class BorderDragCache:
         max_delta_top = min_span_top - 1
         max_delta_bottom = min_span_bottom - 1
 
-        snap_points_x, snap_points_y = grid.get_snap_points(borders=borders)
+        # Snap Points {{{
+        snap_points_x: Iterable[int]
+        snap_points_y: Iterable[int]
+
+        cross_cell = borders.get_cross_cell()
+        if cross_cell is None:
+            snap_points_x = ()
+            snap_points_y = ()
+        else:
+            snap_points_x, snap_points_y = cls._get_potential_snap_points(
+                grid=grid, borders=borders
+            )
+
+            snap_points_x = (
+                x
+                for x in snap_points_x
+                if ((d := x - cross_cell.x) == 0)
+                or (d > 0 and d <= max_delta_right)
+                or (d < 0 and d >= max_delta_left)
+            )
+            snap_points_y = (
+                y
+                for y in snap_points_y
+                if ((d := y - cross_cell.y) == 0)
+                or (d > 0 and d <= max_delta_bottom)
+                or (d < 0 and d >= max_delta_top)
+            )
+        # }}} Snap Points
 
         return BorderDragCache(
             borders=borders,
             grid=grid,
-            snap_proximity=abs(snap_proximity),
             snap_points_x=frozenset(snap_points_x),
             snap_points_y=frozenset(snap_points_y),
             max_delta_left=max_delta_left,
@@ -1553,6 +1542,107 @@ class BorderDragCache:
             max_delta_top=max_delta_top,
             max_delta_bottom=max_delta_bottom,
         )
+
+    def drag(
+        self, *, delta: Cell, snap_proximity: int
+    ) -> tuple[TileGrid, SharedBorders]:
+        cross_cell = self.borders.get_cross_cell()
+        if cross_cell is None:
+            return self.grid, self.borders
+
+        cdx = 0  # Current Delta X
+        if delta.x > 0:
+            cdx = clamp(delta.x, delta.x, self.max_delta_right)
+        elif delta.x < 0:
+            cdx = clamp(delta.x, -self.max_delta_left, delta.x)
+
+        cdy = 0  # Current Delta Y
+        if delta.y > 0:
+            cdy = clamp(delta.y, delta.y, self.max_delta_bottom)
+        elif delta.y < 0:
+            cdy = clamp(delta.y, -self.max_delta_top, delta.y)
+
+        cd = Cell(cdx, cdy)  # Current Delta
+        current_cross_cell = cross_cell + cd
+
+        # Snap {{{
+        cd += Cell(
+            x=min(
+                (
+                    x - current_cross_cell.x
+                    for x in self.snap_points_x
+                    if abs(x - current_cross_cell.x) <= snap_proximity
+                ),
+                key=abs,
+                default=0,
+            ),
+            y=min(
+                (
+                    y - current_cross_cell.y
+                    for y in self.snap_points_y
+                    if abs(y - current_cross_cell.y) <= snap_proximity
+                ),
+                key=abs,
+                default=0,
+            ),
+        )
+        # }}} Snap
+
+        grid = self.grid.replace_tiles(
+            itertools.chain(
+                (t.corners_c2_add(Cell(cd.x, 0)) for t in self.borders.left),
+                (t.corners_c1_add(Cell(cd.x, 0)) for t in self.borders.right),
+            )
+        ).replace_tiles(
+            itertools.chain(
+                (t.corners_c2_add(Cell(0, cd.y)) for t in self.borders.top),
+                (t.corners_c1_add(Cell(0, cd.y)) for t in self.borders.bottom),
+            )
+        )
+
+        return grid, self.borders.pull_coords(grid)
+
+    @classmethod
+    def _get_potential_snap_points(
+        cls, *, grid: TileGrid, borders: SharedBorders
+    ) -> tuple[set[int], set[int]]:
+        """
+        Return: `(xs, ys)`
+        """
+        box = borders.get_box()
+        if box is None:
+            return (set(), set())
+
+        xs: set[int] = set()
+        xs.update(grid.get_top_snap_points(borders=borders))
+        xs.update(
+            grid.mirror_vertically().get_top_snap_points(
+                borders=borders.mirror_vertically()
+            )
+        )
+
+        grid = grid.rotate_counterclockwise()
+        borders = borders.rotate_counterclockwise()
+
+        ys: set[int] = set()
+        ys.update(grid.get_top_snap_points(borders=borders))
+        ys.update(
+            grid.mirror_vertically().get_top_snap_points(
+                borders=borders.mirror_vertically()
+            )
+        )
+
+        return (xs, ys)
+
+
+def clamp(num: int, min: int, max: int) -> int:
+    if num > max:
+        return max
+
+    if num < min:
+        return min
+
+    return num
 
 
 def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
