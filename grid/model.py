@@ -258,15 +258,40 @@ class Tile:
         return (c.c1.x <= cell.x <= c.c2.x) and (c.c1.y <= cell.y <= c.c2.y)
 
     def intersection(self, other: "Tile") -> "Tile | None":
+        self_cc = self.corner_cells()
+        other_cc = other.corner_cells()
+
         cells = tuple(
             itertools.chain(
-                (cell for cell in self.corner_cells() if other.contains_cell(cell)),
-                (cell for cell in other.corner_cells() if self.contains_cell(cell)),
+                (cell for cell in self_cc if other.contains_cell(cell)),
+                (cell for cell in other_cc if self.contains_cell(cell)),
             )
         )
         if len(cells) > 0:
             return Tile.from_cells(cells)
+
+        def handle_plus(
+            corners1: tuple[Cell, Cell, Cell, Cell],
+            corners2: tuple[Cell, Cell, Cell, Cell],
+        ) -> "Tile | None":
+            if corners2[0].y < corners1[0].y < corners2[3].y:
+                return Tile.build(
+                    TileAsCorners(
+                        c1=Cell(x=corners2[0].x, y=corners1[0].y),
+                        c2=Cell(x=corners2[1].x, y=corners1[2].y),
+                    )
+                )
+
+            return None
+
+        if (return_ := handle_plus(self_cc, other_cc)) is not None:
+            return return_
+
+        if (return_ := handle_plus(other_cc, self_cc)) is not None:
+            return return_
+
         return None
+
 
     def intersects_with(self, other: "Tile") -> bool:
         return self.intersection(other) is not None
@@ -1588,15 +1613,22 @@ class BorderDragCache:
         )
         # }}} Snap
 
-        grid = self.grid.replace_tiles(
+        grid = self.grid
+        borders = self.borders
+
+        borders = borders.pull_coords(grid)
+        grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c2_add(Cell(cd.x, 0)) for t in self.borders.left),
-                (t.corners_c1_add(Cell(cd.x, 0)) for t in self.borders.right),
+                (t.corners_c2_add(Cell(cd.x, 0)) for t in borders.left),
+                (t.corners_c1_add(Cell(cd.x, 0)) for t in borders.right),
             )
-        ).replace_tiles(
+        )
+
+        borders = borders.pull_coords(grid)
+        grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c2_add(Cell(0, cd.y)) for t in self.borders.top),
-                (t.corners_c1_add(Cell(0, cd.y)) for t in self.borders.bottom),
+                (t.corners_c2_add(Cell(0, cd.y)) for t in borders.top),
+                (t.corners_c1_add(Cell(0, cd.y)) for t in borders.bottom),
             )
         )
 

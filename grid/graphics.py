@@ -6,6 +6,7 @@ from typing import Generator
 import pygame as pg
 
 from .model import (
+    BorderDragCache,
     BorderMode,
     CardinalDirection,
     Cell,
@@ -18,7 +19,8 @@ from .model import (
 )
 
 
-FPS = 24
+# FPS = 24
+FPS = 1
 
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 1000
@@ -344,81 +346,57 @@ class Mode(Enum):
     SPLIT_RIGHT = "SPLIT_RIGHT"
 
 
-def start() -> None:
+def main_loop() -> None:
     pg.font.init()
     font = pg.font.SysFont("Hack", 25)
 
-    # for _ in range(2):
-    #     clock.tick(FPS)
-    #     draw_grid_setup(tiles=TILES_NORMALIZED, box_corners=BOX_CORNERS)
-
-    # print(list(box_iter(get_box_corners(TILES).normalize())))
-
     # ORIGINAL_TILE_GRID = tile_grid = TileGrid(
-    #     origin=Tile.build(
-    #         TileAsCorners(
-    #             c1=Cell(x=0, y=-1),
-    #             c2=Cell(x=0, y=-2),
-    #         ),
-    #         handle=ORIGIN_HANDLE,
-    #     ),
-    #     other=(
-    #         Tile.build(
-    #             TileAsCorners(
-    #                 c1=Cell(x=0, y=1),
-    #                 c2=Cell(x=1, y=1),
-    #             ),
-    #             handle=generate_handle(),
-    #         ),
-    #         Tile.build(
-    #             TileAsCorners(
-    #                 c1=Cell(x=-1, y=0),
-    #                 c2=Cell(x=-1, y=1),
-    #             ),
-    #             handle=generate_handle(),
-    #         ),
-    #         Tile.build(
-    #             TileAsCorners(
-    #                 c1=Cell(x=1, y=-1),
-    #                 c2=Cell(x=1, y=-1),
-    #             ),
-    #             handle=generate_handle(),
-    #         ),
+    #     (
     #         Tile.build(
     #             TileAsCorners(
     #                 c1=Cell(x=0, y=0),
-    #                 c2=Cell(x=1, y=0),
+    #                 c2=Cell(x=20, y=20),
     #             ),
-    #             handle=generate_handle(),
+    #             handle=ORIGIN_HANDLE,
     #         ),
-    #         Tile.build(
-    #             TileAsCorners(
-    #                 c1=Cell(x=-1, y=-1),
-    #                 c2=Cell(x=-1, y=-1),
-    #             ),
-    #             handle=generate_handle(),
-    #         ),
-    #     ),
+    #     )
     # )
-
-    ORIGINAL_TILE_GRID = tile_grid = TileGrid(
-        (
-            Tile.build(
-                TileAsCorners(
-                    c1=Cell(x=0, y=0),
-                    c2=Cell(x=20, y=20),
+    ORIGINAL_TILE_GRID = tile_grid = (
+        TileGrid(
+            (
+                Tile.build(
+                    TileAsCorners(
+                        c1=Cell(x=0, y=0),
+                        c2=Cell(x=20, y=20),
+                    ),
+                    handle=ORIGIN_HANDLE,
                 ),
-                handle=ORIGIN_HANDLE,
-            ),
+            )
+        )
+        .split_tile(
+            tile_handle=0,
+            direction=CardinalDirection.LEFT,
+            new_tile_handle=generate_handle(),
+        )
+        .split_tile(
+            tile_handle=0,
+            direction=CardinalDirection.DOWN,
+            new_tile_handle=generate_handle(),
+        )
+        .split_tile(
+            tile_handle=1,
+            new_tile_handle=generate_handle(),
+            direction=CardinalDirection.UP,
         )
     )
 
     border_mode = BorderMode.SHORTEST
-
     mode: Mode = Mode.NORMAL
     while True:
-        # Controls {{{
-        for e in pg.event.get():
+        events = tuple(pg.event.get())
+
+        for e in events:
+            # Controls {{{
             if (e.type == pg.QUIT) or ((e.type == pg.KEYDOWN) and (e.key == pg.K_q)):
                 sys.exit()
 
@@ -449,15 +427,15 @@ def start() -> None:
                         print(f"Mode: {mode.value}")
 
                     case pg.K_0:
-                        tile_grid = tile_grid.compact().centralize_origin()
-                        tile_grid = tile_grid.expand().centralize_origin()
-                        tile_grid = tile_grid.compact().centralize_origin()
+                        tile_grid = tile_grid.compact()
+                        tile_grid = tile_grid.expand()
+                        tile_grid = tile_grid.compact()
 
                     case pg.K_m:  # Minimize
-                        tile_grid = tile_grid.compact().centralize_origin()
+                        tile_grid = tile_grid.compact()
 
                     case pg.K_e:
-                        tile_grid = tile_grid.expand().centralize_origin()
+                        tile_grid = tile_grid.expand()
 
                     case pg.K_a:
                         tile_grid = tile_grid.align_borders(proximity=3)
@@ -476,17 +454,15 @@ def start() -> None:
                         print()
 
                     case pg.K_z:
-                        tile_grid = (
-                            tile_grid.rotate_counterclockwise().centralize_origin()
-                        )
+                        tile_grid = tile_grid.rotate_counterclockwise()
 
                     case pg.K_x:
-                        tile_grid = tile_grid.rotate_clockwise().centralize_origin()
+                        tile_grid = tile_grid.rotate_clockwise()
 
                     case pg.K_c:
-                        tile_grid = tile_grid.mirror_horizontally().centralize_origin()
+                        tile_grid = tile_grid.mirror_horizontally()
                     case pg.K_v:
-                        tile_grid = tile_grid.mirror_vertically().centralize_origin()
+                        tile_grid = tile_grid.mirror_vertically()
 
                     case pg.K_b:
                         match border_mode:
@@ -505,8 +481,7 @@ def start() -> None:
 
                 selected_tile: Tile | None = None
                 for tile_translated in (
-                    tile_to_window_space(tile)
-                    for tile in tile_grid.centralize_origin().tiles
+                    tile_to_window_space(tile) for tile in tile_grid.tiles
                 ):
                     if tile_translated.contains_cell(
                         Cell(x=x // CELL_SIDE_LENGTH, y=y // CELL_SIDE_LENGTH)
@@ -518,6 +493,7 @@ def start() -> None:
                     match mode:
                         case Mode.NORMAL:
                             pass
+
                         case Mode.DELETE:
                             tile_grid = tile_grid.delete_by_handle(selected_tile.handle)
 
@@ -537,12 +513,10 @@ def start() -> None:
                                     Mode.SPLIT_RIGHT: CardinalDirection.RIGHT,
                                 }[mode],
                             )
-
-        # }}} Controls
-
-        # Logic {{{
+            # }}} Controls
         tile_grid = tile_grid.centralize_origin()
 
+        # Borders {{{
         mouse_position = pg.mouse.get_pos()
         screen_cursor_cell = Cell(
             x=mouse_position[0] // CELL_SIDE_LENGTH,
@@ -552,9 +526,37 @@ def start() -> None:
 
         shared_borders = tile_grid.get_shared_borders_near(
             cursor_cell, proximity=2, mode=border_mode
-        ).pull_coords(tile_grid)
+        )
 
-        # }}} Logic
+        border_drag_cache: BorderDragCache
+        for e in events:
+            tile_grid = tile_grid.centralize_origin()
+            if (e.type == pg.MOUSEBUTTONDOWN) and (shared_borders.get_cross_cell() is not None):
+               border_drag_cache = BorderDragCache.build(borders=shared_borders, grid=tile_grid)
+               pass
+
+        # tile_grid = tile_grid.align_borders(proximity=2)
+
+        # # Borders Demo {{{
+        # global frame
+        # global once
+        # if once:
+        #     global sb2
+        #     global bdc
+
+        #     once = False
+        #     sb2 = shared_borders = tile_grid.get_shared_borders_near(
+        #         Cell(0, 9), proximity=2, mode=border_mode
+        #     )
+        #     bdc = BorderDragCache.build(borders=sb2, grid=tile_grid)
+
+        # tile_grid, shared_borders = bdc.drag(delta=Cell(frame, frame), snap_proximity=1)
+        # # print(f"{tile_grid=}")
+
+        # frame += 1
+        # # }}} Borders Demo
+
+        # }}} Borders
 
         # Draw {{{
         draw(
@@ -566,9 +568,16 @@ def start() -> None:
         clock.tick(FPS)
         # }}} Draw
 
+# # Borders Demo {{{
+# once = True
+# sb2: SharedBorders
+# bdc: BorderDragCache
+# frame: int = 0
+# # }}} Borders Demo
+
 
 def main() -> None:
-    start()
+    main_loop()
 
 
 if __name__ == "__main__":
