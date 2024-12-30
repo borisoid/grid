@@ -8,3 +8,11 @@ def test_1() -> None:
     assert vertical.intersection(horizontal) == Tile.build(
         TileAsCorners(c1=Cell(0, 10), c2=Cell(0, 10))
     )
+
+
+def test_2() -> None:
+    t1 = Tile.build(TileAsCorners(c1=Cell(x=0, y=11), c2=Cell(x=10, y=20)))
+    t2 = Tile.build(TileAsCorners(c1=Cell(x=-10, y=10), c2=Cell(x=-1, y=20)))
+
+    intersection = t1.intersection(t2)
+    assert intersection is None

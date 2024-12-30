@@ -274,7 +274,7 @@ class Tile:
             corners1: tuple[Cell, Cell, Cell, Cell],
             corners2: tuple[Cell, Cell, Cell, Cell],
         ) -> "Tile | None":
-            if corners2[0].y < corners1[0].y < corners2[3].y:
+            if corners2[0].y < corners1[0].y <= corners1[3].y < corners2[3].y:
                 return Tile.build(
                     TileAsCorners(
                         c1=Cell(x=corners2[0].x, y=corners1[0].y),
