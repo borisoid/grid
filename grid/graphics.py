@@ -19,8 +19,8 @@ from .model import (
 )
 
 
-# FPS = 24
-FPS = 1
+FPS = 24
+# FPS = 1
 
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 1000
@@ -100,8 +100,8 @@ def draw(
     cursor_cell: Cell,
     shared_borders: SharedBorders,
 ) -> None:
-    tile_grid = TileGrid.from_(tile_to_window_space(tile) for tile in tile_grid.tiles)
-    cursor_cell = cell_to_window_space(cursor_cell)
+    tile_grid = TileGrid.from_(tile_to_screen_space(tile) for tile in tile_grid.tiles)
+    cursor_cell = cell_to_screen_space(cursor_cell)
     shared_borders = shared_borders.pull_coords(tile_grid)
 
     tiles = tile_grid.tiles
@@ -311,15 +311,15 @@ def draw(
     pg.display.flip()
 
 
-def cell_to_window_space(cell: Cell) -> Cell:
+def cell_to_screen_space(cell: Cell) -> Cell:
     return cell + Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
 
 
-def cell_from_window_space(cell: Cell) -> Cell:
+def cell_from_screen_space(cell: Cell) -> Cell:
     return cell - Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
 
 
-def tile_to_window_space(tile: Tile) -> Tile:
+def tile_to_screen_space(tile: Tile) -> Tile:
     corners = tile.as_corners()
 
     delta = Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
@@ -360,7 +360,7 @@ def main_loop() -> None:
     #             handle=ORIGIN_HANDLE,
     #         ),
     #     )
-    # )
+    # ).centralize_origin()
     ORIGINAL_TILE_GRID = tile_grid = (
         TileGrid(
             (
@@ -388,10 +388,13 @@ def main_loop() -> None:
             new_tile_handle=generate_handle(),
             direction=CardinalDirection.UP,
         )
-    )
+    ).centralize_origin()
 
     border_mode = BorderMode.SHORTEST
     mode: Mode = Mode.NORMAL
+
+    border_drag_cache: BorderDragCache | None = None
+
     while True:
         events = tuple(pg.event.get())
 
@@ -481,7 +484,7 @@ def main_loop() -> None:
 
                 selected_tile: Tile | None = None
                 for tile_translated in (
-                    tile_to_window_space(tile) for tile in tile_grid.tiles
+                    tile_to_screen_space(tile) for tile in tile_grid.tiles
                 ):
                     if tile_translated.contains_cell(
                         Cell(x=x // CELL_SIDE_LENGTH, y=y // CELL_SIDE_LENGTH)
@@ -514,7 +517,7 @@ def main_loop() -> None:
                                 }[mode],
                             )
             # }}} Controls
-        tile_grid = tile_grid.centralize_origin()
+        # tile_grid = tile_grid.centralize_origin()
 
         # Borders {{{
         mouse_position = pg.mouse.get_pos()
@@ -522,39 +525,29 @@ def main_loop() -> None:
             x=mouse_position[0] // CELL_SIDE_LENGTH,
             y=mouse_position[1] // CELL_SIDE_LENGTH,
         )
-        cursor_cell = cell_from_window_space(screen_cursor_cell)
+        cursor_cell = cell_from_screen_space(screen_cursor_cell)
 
         shared_borders = tile_grid.get_shared_borders_near(
             cursor_cell, proximity=2, mode=border_mode
         )
 
-        border_drag_cache: BorderDragCache
         for e in events:
-            tile_grid = tile_grid.centralize_origin()
-            if (e.type == pg.MOUSEBUTTONDOWN) and (shared_borders.get_cross_cell() is not None):
-               border_drag_cache = BorderDragCache.build(borders=shared_borders, grid=tile_grid)
-               pass
+            if (e.type == pg.MOUSEBUTTONDOWN) and (
+                shared_borders.get_cross_cell() is not None
+            ):
+                border_drag_cache = BorderDragCache.build(
+                    borders=shared_borders, grid=tile_grid, cursor=cursor_cell
+                )
+
+            if e.type == pg.MOUSEBUTTONUP:
+                border_drag_cache = None
+
+        if border_drag_cache is not None:
+            tile_grid, shared_borders = border_drag_cache.drag(
+                to=cursor_cell, snap_proximity=2
+            )
 
         # tile_grid = tile_grid.align_borders(proximity=2)
-
-        # # Borders Demo {{{
-        # global frame
-        # global once
-        # if once:
-        #     global sb2
-        #     global bdc
-
-        #     once = False
-        #     sb2 = shared_borders = tile_grid.get_shared_borders_near(
-        #         Cell(0, 9), proximity=2, mode=border_mode
-        #     )
-        #     bdc = BorderDragCache.build(borders=sb2, grid=tile_grid)
-
-        # tile_grid, shared_borders = bdc.drag(delta=Cell(frame, frame), snap_proximity=1)
-        # # print(f"{tile_grid=}")
-
-        # frame += 1
-        # # }}} Borders Demo
 
         # }}} Borders
 
@@ -567,13 +560,6 @@ def main_loop() -> None:
         )
         clock.tick(FPS)
         # }}} Draw
-
-# # Borders Demo {{{
-# once = True
-# sb2: SharedBorders
-# bdc: BorderDragCache
-# frame: int = 0
-# # }}} Borders Demo
 
 
 def main() -> None:

@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from enum import Enum, IntEnum, auto
 from types import MappingProxyType
-from typing import Iterable, Literal, NewType
+from typing import Iterable, Literal, NewType, overload
 from warnings import deprecated
 
 from kiwisolver import Expression, Solver, Variable
@@ -291,7 +291,6 @@ class Tile:
             return return_
 
         return None
-
 
     def intersects_with(self, other: "Tile") -> bool:
         return self.intersection(other) is not None
@@ -645,6 +644,9 @@ class SharedBorders:
             return vertical.as_corners().c1
 
         if (vertical is not None) and (horizontal is not None):
+            vertical = vertical.corners_c2_add(Cell(0, 1))
+            horizontal = horizontal.corners_c2_add(Cell(1, 0))
+
             intersection = vertical.intersection(horizontal)
             assert intersection is not None
             return intersection.as_corners().c1
@@ -1504,6 +1506,7 @@ class TileGrid:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BorderDragCache:
+    cursor: Cell
     borders: SharedBorders
     grid: TileGrid
 
@@ -1516,7 +1519,9 @@ class BorderDragCache:
     max_delta_bottom: int
 
     @classmethod
-    def build(cls, *, borders: SharedBorders, grid: TileGrid) -> "BorderDragCache":
+    def build(
+        cls, *, borders: SharedBorders, grid: TileGrid, cursor: Cell
+    ) -> "BorderDragCache":
         min1 = functools.partial(min, default=1)
         min_span_left = min1(tile.as_span().span.x for tile in borders.left)
         min_span_right = min1(tile.as_span().span.x for tile in borders.right)
@@ -1558,6 +1563,7 @@ class BorderDragCache:
         # }}} Snap Points
 
         return BorderDragCache(
+            cursor=cursor,
             borders=borders,
             grid=grid,
             snap_points_x=frozenset(snap_points_x),
@@ -1568,9 +1574,23 @@ class BorderDragCache:
             max_delta_bottom=max_delta_bottom,
         )
 
+    @overload
+    def drag(self, *, to: Cell, snap_proximity: int) -> tuple[TileGrid, SharedBorders]:
+        pass
+
+    @overload
     def drag(
         self, *, delta: Cell, snap_proximity: int
     ) -> tuple[TileGrid, SharedBorders]:
+        pass
+
+    def drag(
+        self, *, snap_proximity: int, delta: Cell | None = None, to: Cell | None = None
+    ) -> tuple[TileGrid, SharedBorders]:
+        if delta is None:
+            assert to is not None
+            delta = to - self.cursor
+
         cross_cell = self.borders.get_cross_cell()
         if cross_cell is None:
             return self.grid, self.borders
