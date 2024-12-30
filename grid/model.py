@@ -1316,21 +1316,6 @@ class TileGrid:
             )
         )
 
-    def get_top_snap_points(self, *, borders: SharedBorders) -> set[int]:
-        box = borders.get_box()
-        if box is None:
-            return set()
-
-        bc = box.corner_cells()
-        detector = Tile.build(TileAsCorners(bc[0] + Cell(0, -1), bc[1] + Cell(0, -1)))
-
-        return_: set[int] = set()
-        for tile in self.tiles:
-            if intersection := detector.intersection(tile):
-                return_.add(intersection.as_corners().c1.x)
-
-        return return_
-
     def get_vertical_right_border(
         self, handle: IntHandle, *, mode: BorderMode
     ) -> SharedBorders:
@@ -1551,14 +1536,14 @@ class BorderDragCache:
                 for x in snap_points_x
                 if ((d := x - cross_cell.x) == 0)
                 or (d > 0 and d <= max_delta_right)
-                or (d < 0 and d >= max_delta_left)
+                or (d < 0 and d >= -max_delta_left)
             )
             snap_points_y = (
                 y
                 for y in snap_points_y
                 if ((d := y - cross_cell.y) == 0)
                 or (d > 0 and d <= max_delta_bottom)
-                or (d < 0 and d >= max_delta_top)
+                or (d < 0 and d >= -max_delta_top)
             )
         # }}} Snap Points
 
@@ -1666,25 +1651,43 @@ class BorderDragCache:
             return (set(), set())
 
         xs: set[int] = set()
-        xs.update(grid.get_top_snap_points(borders=borders))
+        xs.update(cls._get_potential_top_snap_points(grid=grid, borders=borders))
         xs.update(
-            grid.mirror_vertically().get_top_snap_points(
-                borders=borders.mirror_vertically()
+            cls._get_potential_top_snap_points(
+                grid=(g := grid.mirror_vertically()), borders=borders.pull_coords(g)
             )
         )
 
         grid = grid.rotate_counterclockwise()
-        borders = borders.rotate_counterclockwise()
+        borders = borders.pull_coords(grid)
 
         ys: set[int] = set()
-        ys.update(grid.get_top_snap_points(borders=borders))
+        ys.update(cls._get_potential_top_snap_points(grid=grid, borders=borders))
         ys.update(
-            grid.mirror_vertically().get_top_snap_points(
-                borders=borders.mirror_vertically()
+            cls._get_potential_top_snap_points(
+                grid=(g := grid.mirror_vertically()), borders=borders.pull_coords(g)
             )
         )
 
         return (xs, ys)
+
+    @classmethod
+    def _get_potential_top_snap_points(
+        cls, *, grid: TileGrid, borders: SharedBorders
+    ) -> set[int]:
+        box = borders.get_box()
+        if box is None:
+            return set()
+
+        bc = box.corner_cells()
+        detector = Tile.build(TileAsCorners(bc[0] + Cell(0, -1), bc[1] + Cell(0, -1)))
+
+        return_: set[int] = set()
+        for tile in grid.tiles:
+            if intersection := detector.intersection(tile):
+                return_.add(intersection.as_corners().c1.x)
+
+        return return_
 
 
 def clamp(num: int, min: int, max: int) -> int:
