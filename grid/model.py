@@ -609,10 +609,10 @@ class SharedBorders:
 
     def rotate_counterclockwise(self) -> "SharedBorders":
         return SharedBorders(
-            left=frozenset(tile.rotate_clockwise() for tile in self.top),
-            right=frozenset(tile.rotate_clockwise() for tile in self.bottom),
-            top=frozenset(tile.rotate_clockwise() for tile in self.right),
-            bottom=frozenset(tile.rotate_clockwise() for tile in self.left),
+            left=frozenset(tile.rotate_counterclockwise() for tile in self.top),
+            right=frozenset(tile.rotate_counterclockwise() for tile in self.bottom),
+            top=frozenset(tile.rotate_counterclockwise() for tile in self.right),
+            bottom=frozenset(tile.rotate_counterclockwise() for tile in self.left),
         )
 
     def mirror_horizontally(self) -> "SharedBorders":
@@ -1654,18 +1654,18 @@ class BorderDragCache:
         xs.update(cls._get_potential_top_snap_points(grid=grid, borders=borders))
         xs.update(
             cls._get_potential_top_snap_points(
-                grid=(g := grid.mirror_vertically()), borders=borders.pull_coords(g)
+                grid=grid.mirror_vertically(), borders=borders.mirror_vertically()
             )
         )
 
         grid = grid.rotate_counterclockwise()
-        borders = borders.pull_coords(grid)
+        borders = borders.rotate_counterclockwise()
 
         ys: set[int] = set()
         ys.update(cls._get_potential_top_snap_points(grid=grid, borders=borders))
         ys.update(
             cls._get_potential_top_snap_points(
-                grid=(g := grid.mirror_vertically()), borders=borders.pull_coords(g)
+                grid=grid.mirror_vertically(), borders=borders.mirror_vertically()
             )
         )
 
@@ -1675,9 +1675,10 @@ class BorderDragCache:
     def _get_potential_top_snap_points(
         cls, *, grid: TileGrid, borders: SharedBorders
     ) -> set[int]:
-        box = borders.get_box()
-        if box is None:
+        tiles = borders.left | borders.right
+        if not tiles:
             return set()
+        box = get_box(tiles)
 
         bc = box.corner_cells()
         detector = Tile.build(TileAsCorners(bc[0] + Cell(0, -1), bc[1] + Cell(0, -1)))
