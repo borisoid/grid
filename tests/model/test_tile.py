@@ -5,7 +5,7 @@ def test_TileAsCorners_normalize() -> None:
     # Setup {{{
     tile_as_corners = TileAsCorners(
         c1=Cell(5, 1),
-        c2=Cell(1, 5),
+        c4=Cell(1, 5),
     )
     # }}} Setup
 
@@ -16,7 +16,7 @@ def test_TileAsCorners_normalize() -> None:
     # Assert {{{
     assert tile_as_corners_normalized == TileAsCorners(
         c1=Cell(1, 1),
-        c2=Cell(5, 5),
+        c4=Cell(5, 5),
     )
     # }}} Assert
 
@@ -36,6 +36,6 @@ def test_TileAsStep_as_corners__when_normalized_and_origin() -> None:
     # Assert {{{
     assert tile_as_corners == TileAsCorners(
         c1=Cell(0, 0),
-        c2=Cell(2, 3),
+        c4=Cell(2, 3),
     )
     # }}} Assert

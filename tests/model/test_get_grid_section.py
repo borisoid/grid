@@ -7,7 +7,7 @@ def test_get_grid_section__when_origin() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -27,7 +27,7 @@ def test_get_grid_section__when_top() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -47,7 +47,7 @@ def test_get_grid_section__when_bottom() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -67,7 +67,7 @@ def test_get_grid_section__when_left() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -87,7 +87,7 @@ def test_get_grid_section__when_right() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -107,7 +107,7 @@ def test_get_grid_section__when_top_left() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -127,7 +127,7 @@ def test_get_grid_section__when_top_right() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -147,7 +147,7 @@ def test_get_grid_section__when_bottom_left() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup
@@ -167,7 +167,7 @@ def test_get_grid_section__when_bottom_right() -> None:
     origin_tile = Tile.build(
         TileAsCorners(
             c1=Cell(x=0, y=0),
-            c2=Cell(x=5, y=5),
+            c4=Cell(x=5, y=5),
         )
     )
     # }}} Setup

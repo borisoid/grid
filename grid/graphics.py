@@ -171,16 +171,16 @@ def draw(
             pg.Vector2(box_corners_2.c1.x * CELL_SIDE_LENGTH, WINDOW_HEIGHT),
         ),
         (
-            pg.Vector2((box_corners_2.c2.x + 1) * CELL_SIDE_LENGTH, 0),
-            pg.Vector2((box_corners_2.c2.x + 1) * CELL_SIDE_LENGTH, WINDOW_HEIGHT),
+            pg.Vector2((box_corners_2.c4.x + 1) * CELL_SIDE_LENGTH, 0),
+            pg.Vector2((box_corners_2.c4.x + 1) * CELL_SIDE_LENGTH, WINDOW_HEIGHT),
         ),
         (
             pg.Vector2(0, box_corners_2.c1.y * CELL_SIDE_LENGTH),
             pg.Vector2(WINDOW_WIDTH, box_corners_2.c1.y * CELL_SIDE_LENGTH),
         ),
         (
-            pg.Vector2(0, (box_corners_2.c2.y + 1) * CELL_SIDE_LENGTH),
-            pg.Vector2(WINDOW_WIDTH, (box_corners_2.c2.y + 1) * CELL_SIDE_LENGTH),
+            pg.Vector2(0, (box_corners_2.c4.y + 1) * CELL_SIDE_LENGTH),
+            pg.Vector2(WINDOW_WIDTH, (box_corners_2.c4.y + 1) * CELL_SIDE_LENGTH),
         ),
     ):
         pg.draw.line(
@@ -250,7 +250,7 @@ def draw(
         if not tiles:
             return
 
-        corner_cells = get_box(tiles).corner_cells()
+        corner_cells = get_box(tiles).as_4_corners()
         border_cells = corner_cells[0], corner_cells[2]
 
         pg.draw.line(
@@ -274,7 +274,7 @@ def draw(
         if not tiles:
             return
 
-        corner_cells = get_box(tiles).corner_cells()
+        corner_cells = get_box(tiles).as_4_corners()
         border_cells = corner_cells[0], corner_cells[1]
 
         pg.draw.line(
@@ -326,7 +326,7 @@ def tile_to_screen_space(tile: Tile) -> Tile:
     return tile.replace_tile(
         TileAsCorners(
             c1=corners.c1 + delta,
-            c2=corners.c2 + delta,
+            c4=corners.c4 + delta,
         )
     )
 
@@ -355,7 +355,7 @@ def main_loop() -> None:
     #         Tile.build(
     #             TileAsCorners(
     #                 c1=Cell(x=0, y=0),
-    #                 c2=Cell(x=20, y=20),
+    #                 c4=Cell(x=20, y=20),
     #             ),
     #             handle=ORIGIN_HANDLE,
     #         ),
@@ -367,7 +367,7 @@ def main_loop() -> None:
                 Tile.build(
                     TileAsCorners(
                         c1=Cell(x=0, y=0),
-                        c2=Cell(x=20, y=20),
+                        c4=Cell(x=20, y=20),
                     ),
                     handle=ORIGIN_HANDLE,
                 ),
