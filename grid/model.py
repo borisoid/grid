@@ -1312,6 +1312,7 @@ class TileGrid:
         if ignore_plus or (mode == BorderMode.LONGEST):
             return shared_borders
 
+        # Handle "+" {{{
         vertical, horizontal = shared_borders.as_tiles()
         if (vertical is None) or (horizontal is None):
             return shared_borders
@@ -1326,8 +1327,7 @@ class TileGrid:
             return shared_borders
 
         intersection = vertical.intersection(horizontal)
-        if intersection is None:
-            raise Unreachable
+        assert intersection is not None
 
         new_base_cell = intersection.as_corners().c0 + Cell(
             x=-1 if h1 in (v1, v2) else 1,
@@ -1340,6 +1340,7 @@ class TileGrid:
             mode=BorderMode.SHORTEST,
             ignore_plus=True,
         ).union(shared_borders)
+        # }}} Handle "+"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
