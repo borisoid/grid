@@ -115,8 +115,8 @@ class TileAsSpan:
 
     def as_corners(self) -> "TileAsCornersNormalized":
         return TileAsCorners(
-            c1=self.cell,
-            c4=self.cell + self.span + Cell(-1, -1),
+            c0=self.cell,
+            c3=self.cell + self.span + Cell(-1, -1),
         ).normalize()
 
 
@@ -127,26 +127,26 @@ class TileAsStep:
 
     def as_corners(self) -> "TileAsCornersNormalized":
         return TileAsCorners(
-            c1=self.cell,
-            c4=self.cell + self.step,
+            c0=self.cell,
+            c3=self.cell + self.step,
         ).normalize()
 
 
 @dataclass(frozen=True, slots=True)
 class TileAsCorners:
-    c1: Cell
-    c4: Cell
+    c0: Cell
+    c3: Cell
 
     def normalize(self) -> "TileAsCornersNormalized":
         return TileAsCornersNormalized(
             TileAsCorners(
-                c1=Cell(
-                    x=min(self.c1.x, self.c4.x),
-                    y=min(self.c1.y, self.c4.y),
+                c0=Cell(
+                    x=min(self.c0.x, self.c3.x),
+                    y=min(self.c0.y, self.c3.y),
                 ),
-                c4=Cell(
-                    x=max(self.c1.x, self.c4.x),
-                    y=max(self.c1.y, self.c4.y),
+                c3=Cell(
+                    x=max(self.c0.x, self.c3.x),
+                    y=max(self.c0.y, self.c3.y),
                 ),
             )
         )
@@ -174,12 +174,12 @@ assert cell.step.y >= 0
 
 TileAsCornersNormalized = NewType("TileAsCornersNormalized", TileAsCorners)
 """
-`c1` is the top left corner - `c1.x` and `c1.y` are low.
+`c0` is the top left corner - `c0.x` and `c0.y` are low.
 
-`c4` is the bottom right corner - `c4.x` and `c4.y` are high.
+`c3` is the bottom right corner - `c3.x` and `c3.y` are high.
 
 ```
-delta = c4 - c1
+delta = c3 - c0
 assert delta.x >= 0
 assert delta.y >= 0
 ```
@@ -217,8 +217,8 @@ class Tile:
 
         return TileAsStepNormalized(
             TileAsStep(
-                cell=tile.c1,
-                step=tile.c4 - tile.c1,
+                cell=tile.c0,
+                step=tile.c3 - tile.c0,
             )
         )
 
@@ -227,8 +227,8 @@ class Tile:
 
         return TileAsSpanNormalized(
             TileAsSpan(
-                cell=tile.c1,
-                span=tile.c4 - tile.c1 + Cell(1, 1),
+                cell=tile.c0,
+                span=tile.c3 - tile.c0 + Cell(1, 1),
             )
         )
 
@@ -254,35 +254,35 @@ class Tile:
     def replace_tile(self, arg: TileAsCorners | TileAsStep) -> "Tile":
         return Tile.build(arg, handle=self.handle)
 
-    def corners_c1_add(self, cell: Cell) -> "Tile":
+    def corners_c0_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
-        return self.replace_tile(TileAsCorners(c1=tc.c1 + cell, c4=tc.c4))
+        return self.replace_tile(TileAsCorners(c0=tc.c0 + cell, c3=tc.c3))
 
-    def corners_c4_add(self, cell: Cell) -> "Tile":
+    def corners_c3_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
-        return self.replace_tile(TileAsCorners(c1=tc.c1, c4=tc.c4 + cell))
+        return self.replace_tile(TileAsCorners(c0=tc.c0, c3=tc.c3 + cell))
 
     def translate(self, *, delta: Cell) -> "Tile":
         return self.replace_tile(
             TileAsCorners(
-                c1=self.as_corners().c1 + delta,
-                c4=self.as_corners().c4 + delta,
+                c0=self.as_corners().c0 + delta,
+                c3=self.as_corners().c3 + delta,
             )
         )
 
     def mirror_horizontally(self) -> "Tile":
         return self.replace_tile(
             TileAsCorners(
-                c1=self.as_corners().c1.mirror_horizontally(),
-                c4=self.as_corners().c4.mirror_horizontally(),
+                c0=self.as_corners().c0.mirror_horizontally(),
+                c3=self.as_corners().c3.mirror_horizontally(),
             )
         )
 
     def mirror_vertically(self) -> "Tile":
         return self.replace_tile(
             TileAsCorners(
-                c1=self.as_corners().c1.mirror_vertically(),
-                c4=self.as_corners().c4.mirror_vertically(),
+                c0=self.as_corners().c0.mirror_vertically(),
+                c3=self.as_corners().c3.mirror_vertically(),
             )
         )
 
@@ -296,34 +296,34 @@ class Tile:
     def rotate_clockwise(self) -> "Tile":
         return self.replace_tile(
             TileAsCorners(
-                c1=self.as_corners().c1.rotate_clockwise(),
-                c4=self.as_corners().c4.rotate_clockwise(),
+                c0=self.as_corners().c0.rotate_clockwise(),
+                c3=self.as_corners().c3.rotate_clockwise(),
             )
         )
 
     def rotate_counterclockwise(self) -> "Tile":
         return self.replace_tile(
             TileAsCorners(
-                c1=self.as_corners().c1.rotate_counterclockwise(),
-                c4=self.as_corners().c4.rotate_counterclockwise(),
+                c0=self.as_corners().c0.rotate_counterclockwise(),
+                c3=self.as_corners().c3.rotate_counterclockwise(),
             )
         )
 
     def rotate(self, side: CardinalDirection, /, *, to: CardinalDirection) -> "Tile":
         return self.replace_tile(
             TileAsCorners(
-                c1=self.as_corners().c1.rotate(side, to=to),
-                c4=self.as_corners().c4.rotate(side, to=to),
+                c0=self.as_corners().c0.rotate(side, to=to),
+                c3=self.as_corners().c3.rotate(side, to=to),
             )
         )
 
     @staticmethod
     def from_cells(cells: Iterable[Cell]) -> "Tile":
-        return get_box(Tile.build(TileAsCorners(c1=cell, c4=cell)) for cell in cells)
+        return get_box(Tile.build(TileAsCorners(c0=cell, c3=cell)) for cell in cells)
 
     def contains_cell(self, cell: Cell) -> bool:
         c = self.as_corners()
-        return (c.c1.x <= cell.x <= c.c4.x) and (c.c1.y <= cell.y <= c.c4.y)
+        return (c.c0.x <= cell.x <= c.c3.x) and (c.c0.y <= cell.y <= c.c3.y)
 
     def intersection(self, other: "Tile") -> "Tile | None":
         self_cc = self.as_4_corners()
@@ -345,8 +345,8 @@ class Tile:
             if corners2[0].y < corners1[0].y <= corners1[3].y < corners2[3].y:
                 return Tile.build(
                     TileAsCorners(
-                        c1=Cell(x=corners2[0].x, y=corners1[0].y),
-                        c4=Cell(x=corners2[1].x, y=corners1[2].y),
+                        c0=Cell(x=corners2[0].x, y=corners1[0].y),
+                        c3=Cell(x=corners2[1].x, y=corners1[2].y),
                     )
                 )
 
@@ -372,13 +372,13 @@ class Tile:
 
         return Tile.build(
             TileAsCorners(
-                c1=Cell(
-                    x=min(tile_1.c1.x, tile_1.c4.x, tile_2.c1.x, tile_2.c4.x),
-                    y=min(tile_1.c1.y, tile_1.c4.y, tile_2.c1.y, tile_2.c4.y),
+                c0=Cell(
+                    x=min(tile_1.c0.x, tile_1.c3.x, tile_2.c0.x, tile_2.c3.x),
+                    y=min(tile_1.c0.y, tile_1.c3.y, tile_2.c0.y, tile_2.c3.y),
                 ),
-                c4=Cell(
-                    x=max(tile_1.c1.x, tile_1.c4.x, tile_2.c1.x, tile_2.c4.x),
-                    y=max(tile_1.c1.y, tile_1.c4.y, tile_2.c1.y, tile_2.c4.y),
+                c3=Cell(
+                    x=max(tile_1.c0.x, tile_1.c3.x, tile_2.c0.x, tile_2.c3.x),
+                    y=max(tile_1.c0.y, tile_1.c3.y, tile_2.c0.y, tile_2.c3.y),
                 ),
             )
         )
@@ -428,12 +428,12 @@ class Tile:
 
         area_to_free = Tile.build(
             TileAsCorners(
-                c1=dataclasses.replace(inter.as_corners().c1, x=curr.as_corners().c1.x),
-                c4=dataclasses.replace(inter.as_corners().c4, x=curr.as_corners().c4.x),
+                c0=dataclasses.replace(inter.as_corners().c0, x=curr.as_corners().c0.x),
+                c3=dataclasses.replace(inter.as_corners().c3, x=curr.as_corners().c3.x),
             )
         )
 
-        mirror = area_to_free.as_corners().c1 == curr.as_corners().c1
+        mirror = area_to_free.as_corners().c0 == curr.as_corners().c0
         if mirror:
             curr = curr.mirror_vertically()
             area_to_free = area_to_free.mirror_vertically()
@@ -441,8 +441,8 @@ class Tile:
         # Cut bottom part
         curr = curr.replace_tile(
             TileAsCorners(
-                c1=curr.as_corners().c1,
-                c4=area_to_free.as_4_corners()[1] - Cell(0, 1),
+                c0=curr.as_corners().c0,
+                c3=area_to_free.as_4_corners()[1] - Cell(0, 1),
             )
         )
 
@@ -456,7 +456,7 @@ class Tile:
 
         return tuple(
             Line(coordinate=x, orientation=Orientation.VERTICAL)
-            for x in range(tile.c1.x, tile.c4.x + 1)
+            for x in range(tile.c0.x, tile.c3.x + 1)
         )
 
     def shred_horizontally(self) -> tuple["Line", ...]:
@@ -464,7 +464,7 @@ class Tile:
 
         return tuple(
             Line(coordinate=y, orientation=Orientation.HORIZONTAL)
-            for y in range(tile.c1.y, tile.c4.y + 1)
+            for y in range(tile.c0.y, tile.c3.y + 1)
         )
 
 
@@ -479,7 +479,7 @@ def get_box(tiles: Iterable[Tile]) -> Tile:
 
 def get_ys(tiles: Iterable[Tile]) -> set[int]:
     return set(
-        itertools.chain(*((t.c1.y, t.c4.y) for t in (t.as_corners() for t in tiles)))
+        itertools.chain(*((t.c0.y, t.c3.y) for t in (t.as_corners() for t in tiles)))
     )
 
 
@@ -636,18 +636,18 @@ class SharedBorders:
             return None
 
         if (vertical is None) and (horizontal is not None):
-            return horizontal.as_corners().c1
+            return horizontal.as_corners().c0
 
         if (vertical is not None) and (horizontal is None):
-            return vertical.as_corners().c1
+            return vertical.as_corners().c0
 
         if (vertical is not None) and (horizontal is not None):
-            vertical = vertical.corners_c4_add(Cell(0, 1))
-            horizontal = horizontal.corners_c4_add(Cell(1, 0))
+            vertical = vertical.corners_c3_add(Cell(0, 1))
+            horizontal = horizontal.corners_c3_add(Cell(1, 0))
 
             intersection = vertical.intersection(horizontal)
             assert intersection is not None
-            return intersection.as_corners().c1
+            return intersection.as_corners().c0
 
         return None
 
@@ -670,7 +670,7 @@ class TileGrid:
         return get_box(self.tiles)
 
     def centralize_origin(self) -> "TileGrid":
-        return self.translate(delta=Cell(x=0, y=0) - self.tiles[0].as_corners().c1)
+        return self.translate(delta=Cell(x=0, y=0) - self.tiles[0].as_corners().c0)
 
     def try_get_tile_by_handle(self, handle: IntHandle) -> Tile | None:
         for tile in self.tiles:
@@ -788,8 +788,8 @@ class TileGrid:
                         new_tiles.append(
                             tile.replace_tile(
                                 TileAsCorners(
-                                    c1=tile.as_corners().c1 + delta,
-                                    c4=tile.as_corners().c4 + delta,
+                                    c0=tile.as_corners().c0 + delta,
+                                    c3=tile.as_corners().c3 + delta,
                                 )
                             )
                         )
@@ -797,8 +797,8 @@ class TileGrid:
                     new_tiles.append(
                         tile.replace_tile(
                             TileAsCorners(
-                                c1=tile.as_corners().c1,
-                                c4=tile.as_corners().c4 + delta,
+                                c0=tile.as_corners().c0,
+                                c3=tile.as_corners().c3 + delta,
                             )
                         )
                     )
@@ -819,29 +819,29 @@ class TileGrid:
                 # Right
                 tile.replace_tile(
                     TileAsCorners(
-                        c1=tile.as_corners().c1,
-                        c4=tile.as_corners().c4 + Cell(x=1, y=0),
+                        c0=tile.as_corners().c0,
+                        c3=tile.as_corners().c3 + Cell(x=1, y=0),
                     )
                 ),
                 # Down
                 tile.replace_tile(
                     TileAsCorners(
-                        c1=tile.as_corners().c1,
-                        c4=tile.as_corners().c4 + Cell(x=0, y=1),
+                        c0=tile.as_corners().c0,
+                        c3=tile.as_corners().c3 + Cell(x=0, y=1),
                     )
                 ),
                 # Left
                 tile.replace_tile(
                     TileAsCorners(
-                        c1=tile.as_corners().c1 + Cell(x=-1, y=0),
-                        c4=tile.as_corners().c4,
+                        c0=tile.as_corners().c0 + Cell(x=-1, y=0),
+                        c3=tile.as_corners().c3,
                     )
                 ),
                 # Up
                 tile.replace_tile(
                     TileAsCorners(
-                        c1=tile.as_corners().c1 + Cell(x=0, y=-1),
-                        c4=tile.as_corners().c4,
+                        c0=tile.as_corners().c0 + Cell(x=0, y=-1),
+                        c3=tile.as_corners().c3,
                     )
                 ),
             ):
@@ -885,7 +885,7 @@ class TileGrid:
 
         new_tiles: list[Tile] = []
         line = Line(
-            coordinate=anchor_tile.as_corners().c4.x,
+            coordinate=anchor_tile.as_corners().c3.x,
             orientation=Orientation.VERTICAL,
         )
         # Make space (to the RIGHT) {{{
@@ -901,8 +901,8 @@ class TileGrid:
                 new_tiles.append(
                     tile.replace_tile(
                         TileAsCorners(
-                            c1=tile.as_corners().c1,
-                            c4=tile.as_corners().c4 + Cell(x=1, y=0),
+                            c0=tile.as_corners().c0,
+                            c3=tile.as_corners().c3 + Cell(x=1, y=0),
                         )
                     )
                 )
@@ -912,8 +912,8 @@ class TileGrid:
                 new_tiles.append(
                     tile.replace_tile(
                         TileAsCorners(
-                            c1=tile.as_corners().c1 + Cell(x=1, y=0),
-                            c4=tile.as_corners().c4 + Cell(x=1, y=0),
+                            c0=tile.as_corners().c0 + Cell(x=1, y=0),
+                            c3=tile.as_corners().c3 + Cell(x=1, y=0),
                         )
                     )
                 )
@@ -923,7 +923,7 @@ class TileGrid:
         new_tiles.append(
             Tile.build(
                 TileAsStep(
-                    cell=anchor_tile.as_corners().c4 + Cell(x=1, y=0),
+                    cell=anchor_tile.as_corners().c3 + Cell(x=1, y=0),
                     step=Cell(x=0, y=-anchor_tile.as_step().step.y),
                 ),
                 handle=new_tile_handle,
@@ -964,22 +964,22 @@ class TileGrid:
         new_tiles: list[Tile] = []
         for tile in self.tiles:
             corners = tile.as_corners()
-            width = corners.c4.x - corners.c1.x
+            width = corners.c3.x - corners.c0.x
 
             if (tile.handle != tile_handle) or (width < 2):
                 new_tiles.append(tile)
                 continue
 
-            c4 = Cell(x=corners.c1.x + (width // 2), y=corners.c4.y)
-            c1 = Cell(x=c4.x + 1, y=corners.c1.y)
+            c3 = Cell(x=corners.c0.x + (width // 2), y=corners.c3.y)
+            c0 = Cell(x=c3.x + 1, y=corners.c0.y)
 
             new_tiles.extend(
                 (
                     tile.replace_tile(
-                        TileAsCorners(c1=corners.c1, c4=c4),
+                        TileAsCorners(c0=corners.c0, c3=c3),
                     ),
                     Tile.build(
-                        TileAsCorners(c1=c1, c4=corners.c4),
+                        TileAsCorners(c0=c0, c3=corners.c3),
                         handle=new_tile_handle,
                     ),
                 )
@@ -1011,7 +1011,7 @@ class TileGrid:
             handle: IntHandle
 
         tiles_sorted = tuple(
-            sorted(self.tiles, key=lambda tile: tile.as_corners().c1.x)
+            sorted(self.tiles, key=lambda tile: tile.as_corners().c0.x)
         )
 
         # Variable declaration {{{
@@ -1174,24 +1174,24 @@ class TileGrid:
         for t2 in self.tiles:
             tc2 = t2.as_corners()
             if (
-                (tc2.c1.y == tc.c4.y + 1)
-                and (tc.c4.x >= tc2.c4.x)
-                and (tc.c1.x <= tc2.c4.x)
-                and ((tc.c4.x - tc2.c4.x) <= proximity)
-                and ((max_x is None) or (tc2.c4.x > max_x))
+                (tc2.c0.y == tc.c3.y + 1)
+                and (tc.c3.x >= tc2.c3.x)
+                and (tc.c0.x <= tc2.c3.x)
+                and ((tc.c3.x - tc2.c3.x) <= proximity)
+                and ((max_x is None) or (tc2.c3.x > max_x))
             ):
-                max_x = tc2.c4.x
+                max_x = tc2.c3.x
                 tile_2 = t2
 
         if tile_2 is None:
             return self
 
-        delta_x = tc.c4.x - tile_2.as_corners().c4.x
+        delta_x = tc.c3.x - tile_2.as_corners().c3.x
         shared_borders = self.get_longest_vertical_right_border(tile_2.handle)
         return self.replace_tiles(
             itertools.chain(
-                (t.corners_c4_add(Cell(delta_x, 0)) for t in shared_borders.left),
-                (t.corners_c1_add(Cell(delta_x, 0)) for t in shared_borders.right),
+                (t.corners_c3_add(Cell(delta_x, 0)) for t in shared_borders.left),
+                (t.corners_c0_add(Cell(delta_x, 0)) for t in shared_borders.right),
             )
         )
 
@@ -1209,14 +1209,14 @@ class TileGrid:
         tc = tile.as_corners()
         tiles = self.tiles
 
-        possible_left = [t for t in tiles if tc.c4.x == t.as_corners().c4.x]
-        possible_right = [t for t in tiles if tc.c4.x + 1 == t.as_corners().c1.x]
+        possible_left = [t for t in tiles if tc.c3.x == t.as_corners().c3.x]
+        possible_right = [t for t in tiles if tc.c3.x + 1 == t.as_corners().c0.x]
 
         if not possible_right:
             return SharedBorders(left=frozenset(possible_left), right=frozenset())
 
-        y_min: int = tc.c1.y
-        y_max: int = tc.c4.y
+        y_min: int = tc.c0.y
+        y_max: int = tc.c3.y
 
         left_and_right_swapped: bool = False
         tiles_left: set[Tile] = {tile}
@@ -1224,16 +1224,16 @@ class TileGrid:
         while True:
             detector = Tile.build(
                 TileAsCorners(
-                    Cell(x=tc.c4.x, y=y_min),
-                    Cell(x=tc.c4.x + 1, y=y_max),
+                    Cell(x=tc.c3.x, y=y_min),
+                    Cell(x=tc.c3.x + 1, y=y_max),
                 )
             )
             for tile_right in possible_right:
                 if tile_right.intersection(detector) is not None:
                     tiles_right.add(tile_right)
 
-            new_y_min = min(t.as_corners().c1.y for t in tiles_right)
-            new_y_max = max(t.as_corners().c4.y for t in tiles_right)
+            new_y_min = min(t.as_corners().c0.y for t in tiles_right)
+            new_y_max = max(t.as_corners().c3.y for t in tiles_right)
 
             if (new_y_min, new_y_max) == (y_min, y_max):
                 break
@@ -1253,8 +1253,8 @@ class TileGrid:
         shared_borders = self.get_shortest_vertical_right_border(handle)
 
         while True:
-            a = min(shared_borders.left, key=lambda t: t.as_corners().c1.y)
-            b = max(shared_borders.left, key=lambda t: t.as_corners().c4.y)
+            a = min(shared_borders.left, key=lambda t: t.as_corners().c0.y)
+            b = max(shared_borders.left, key=lambda t: t.as_corners().c3.y)
 
             break_ = True
             for tile in self.tiles:
@@ -1340,8 +1340,8 @@ class TileGrid:
         if (vertical is None) or (horizontal is None):
             return shared_borders
 
-        vertical = vertical.corners_c4_add(Cell(0, 1))
-        horizontal = horizontal.corners_c4_add(Cell(1, 0))
+        vertical = vertical.corners_c3_add(Cell(0, 1))
+        horizontal = horizontal.corners_c3_add(Cell(1, 0))
 
         v1, v2 = vertical.as_4_corners()[0:3:2]
         h1, h2 = horizontal.as_4_corners()[0:2]
@@ -1358,7 +1358,7 @@ class TileGrid:
         if intersection is None:
             raise Unreachable
 
-        new_base_cell = intersection.as_corners().c1 + delta
+        new_base_cell = intersection.as_corners().c0 + delta
 
         return self.get_shared_borders_near(
             new_base_cell,
@@ -1503,16 +1503,16 @@ class BorderDragCache:
         borders = borders.pull_coords(grid)
         grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c4_add(Cell(cd.x, 0)) for t in borders.left),
-                (t.corners_c1_add(Cell(cd.x, 0)) for t in borders.right),
+                (t.corners_c3_add(Cell(cd.x, 0)) for t in borders.left),
+                (t.corners_c0_add(Cell(cd.x, 0)) for t in borders.right),
             )
         )
 
         borders = borders.pull_coords(grid)
         grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c4_add(Cell(0, cd.y)) for t in borders.top),
-                (t.corners_c1_add(Cell(0, cd.y)) for t in borders.bottom),
+                (t.corners_c3_add(Cell(0, cd.y)) for t in borders.top),
+                (t.corners_c0_add(Cell(0, cd.y)) for t in borders.bottom),
             )
         )
 
@@ -1565,7 +1565,7 @@ class BorderDragCache:
         return_: set[int] = set()
         for tile in grid.tiles:
             if intersection := detector.intersection(tile):
-                return_.add(intersection.as_corners().c1.x)
+                return_.add(intersection.as_corners().c0.x)
 
         return return_
 
@@ -1647,10 +1647,10 @@ class Line:
 
         return (
             (self.orientation == Orientation.HORIZONTAL)
-            and (corners.c1.y <= self.coordinate <= corners.c4.y)
+            and (corners.c0.y <= self.coordinate <= corners.c3.y)
         ) or (
             (self.orientation == Orientation.VERTICAL)
-            and (corners.c1.x <= self.coordinate <= corners.c4.x)
+            and (corners.c0.x <= self.coordinate <= corners.c3.x)
         )
 
     def touches_tile(self, tile: Tile) -> bool:
@@ -1658,28 +1658,28 @@ class Line:
 
         return (
             (self.orientation == Orientation.HORIZONTAL)
-            and (self.coordinate in (corners.c1.y, corners.c4.y))
+            and (self.coordinate in (corners.c0.y, corners.c3.y))
         ) or (
             (self.orientation == Orientation.VERTICAL)
-            and (self.coordinate in (corners.c1.x, corners.c4.x))
+            and (self.coordinate in (corners.c0.x, corners.c3.x))
         )
 
     def on_positive_side_of_tile(self, tile: Tile) -> bool:
         c = tile.as_corners()
 
         return (
-            (self.orientation == Orientation.HORIZONTAL) and (self.coordinate >= c.c4.y)
+            (self.orientation == Orientation.HORIZONTAL) and (self.coordinate >= c.c3.y)
         ) or (
-            (self.orientation == Orientation.VERTICAL) and (self.coordinate >= c.c4.x)
+            (self.orientation == Orientation.VERTICAL) and (self.coordinate >= c.c3.x)
         )
 
     def on_negative_side_of_tile(self, tile: Tile) -> bool:
         c = tile.as_corners()
 
         return (
-            (self.orientation == Orientation.HORIZONTAL) and (self.coordinate <= c.c1.y)
+            (self.orientation == Orientation.HORIZONTAL) and (self.coordinate <= c.c0.y)
         ) or (
-            (self.orientation == Orientation.VERTICAL) and (self.coordinate <= c.c1.x)
+            (self.orientation == Orientation.VERTICAL) and (self.coordinate <= c.c0.x)
         )
 
 
@@ -1693,43 +1693,43 @@ def get_grid_section(*, cell: Cell, origin_tile: Tile) -> GridSection:
     origin_corners = origin_tile.as_corners()
 
     if (
-        (cell.x >= origin_corners.c1.x)
-        and (cell.x <= origin_corners.c4.x)
-        and (cell.y < origin_corners.c1.y)
+        (cell.x >= origin_corners.c0.x)
+        and (cell.x <= origin_corners.c3.x)
+        and (cell.y < origin_corners.c0.y)
     ):
         return GridSection.TOP
 
     if (
-        (cell.x >= origin_corners.c1.x)
-        and (cell.x <= origin_corners.c4.x)
-        and (cell.y > origin_corners.c4.y)
+        (cell.x >= origin_corners.c0.x)
+        and (cell.x <= origin_corners.c3.x)
+        and (cell.y > origin_corners.c3.y)
     ):
         return GridSection.BOTTOM
 
     if (
-        (cell.y >= origin_corners.c1.y)
-        and (cell.y <= origin_corners.c4.y)
-        and (cell.x < origin_corners.c1.x)
+        (cell.y >= origin_corners.c0.y)
+        and (cell.y <= origin_corners.c3.y)
+        and (cell.x < origin_corners.c0.x)
     ):
         return GridSection.LEFT
 
     if (
-        (cell.y >= origin_corners.c1.y)
-        and (cell.y <= origin_corners.c4.y)
-        and (cell.x > origin_corners.c4.x)
+        (cell.y >= origin_corners.c0.y)
+        and (cell.y <= origin_corners.c3.y)
+        and (cell.x > origin_corners.c3.x)
     ):
         return GridSection.RIGHT
 
-    if (cell.x < origin_corners.c1.x) and (cell.y < origin_corners.c1.y):
+    if (cell.x < origin_corners.c0.x) and (cell.y < origin_corners.c0.y):
         return GridSection.TOP_LEFT
 
-    if (cell.x > origin_corners.c4.x) and (cell.y < origin_corners.c1.y):
+    if (cell.x > origin_corners.c3.x) and (cell.y < origin_corners.c0.y):
         return GridSection.TOP_RIGHT
 
-    if (cell.x < origin_corners.c1.x) and (cell.y > origin_corners.c4.y):
+    if (cell.x < origin_corners.c0.x) and (cell.y > origin_corners.c3.y):
         return GridSection.BOTTOM_LEFT
 
-    if (cell.x > origin_corners.c4.x) and (cell.y > origin_corners.c4.y):
+    if (cell.x > origin_corners.c3.x) and (cell.y > origin_corners.c3.y):
         return GridSection.BOTTOM_RIGHT
 
     raise Unreachable

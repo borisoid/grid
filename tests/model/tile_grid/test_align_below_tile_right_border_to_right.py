@@ -20,21 +20,21 @@ def test_1() -> None:
 
 def test_2() -> None:
     g1 = TileGrid.from_(
-        Tile.build(TileAsCorners(c1=Cell(x=10, y=0), c4=Cell(x=20, y=10)), handle=0),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=10), c4=Cell(x=9, y=12)), handle=1),
-        Tile.build(TileAsCorners(c1=Cell(x=10, y=11), c4=Cell(x=20, y=20)), handle=2),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=0), c4=Cell(x=9, y=9)), handle=3),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=16), c4=Cell(x=9, y=20)), handle=4),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=13), c4=Cell(x=9, y=15)), handle=5),
+        Tile.build(TileAsCorners(c0=Cell(x=10, y=0), c3=Cell(x=20, y=10)), handle=0),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=10), c3=Cell(x=9, y=12)), handle=1),
+        Tile.build(TileAsCorners(c0=Cell(x=10, y=11), c3=Cell(x=20, y=20)), handle=2),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=0), c3=Cell(x=9, y=9)), handle=3),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=16), c3=Cell(x=9, y=20)), handle=4),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=13), c3=Cell(x=9, y=15)), handle=5),
     )
 
     g2 = TileGrid.from_(
-        Tile.build(TileAsCorners(c1=Cell(x=10, y=0), c4=Cell(x=20, y=9)), handle=0),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=10), c4=Cell(x=9, y=12)), handle=1),
-        Tile.build(TileAsCorners(c1=Cell(x=10, y=10), c4=Cell(x=20, y=20)), handle=2),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=0), c4=Cell(x=9, y=9)), handle=3),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=16), c4=Cell(x=9, y=20)), handle=4),
-        Tile.build(TileAsCorners(c1=Cell(x=0, y=13), c4=Cell(x=9, y=15)), handle=5),
+        Tile.build(TileAsCorners(c0=Cell(x=10, y=0), c3=Cell(x=20, y=9)), handle=0),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=10), c3=Cell(x=9, y=12)), handle=1),
+        Tile.build(TileAsCorners(c0=Cell(x=10, y=10), c3=Cell(x=20, y=20)), handle=2),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=0), c3=Cell(x=9, y=9)), handle=3),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=16), c3=Cell(x=9, y=20)), handle=4),
+        Tile.build(TileAsCorners(c0=Cell(x=0, y=13), c3=Cell(x=9, y=15)), handle=5),
     )
 
     assert g1.align_borders(proximity=3) == g2
