@@ -1124,38 +1124,38 @@ class TileGrid:
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
         return (
-            self.align_right_borders_to_right(proximity=proximity)
+            self.align_left_borders_to_left(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders_to_right(proximity=proximity)
+            .align_left_borders_to_left(proximity=proximity)
             .mirror_vertically()
-            .align_right_borders_to_right(proximity=proximity)
+            .align_left_borders_to_left(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders_to_right(proximity=proximity)
+            .align_left_borders_to_left(proximity=proximity)
             .mirror_vertically()
             .rotate_clockwise()
-            .align_right_borders_to_right(proximity=proximity)
+            .align_left_borders_to_left(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders_to_right(proximity=proximity)
+            .align_left_borders_to_left(proximity=proximity)
             .mirror_vertically()
-            .align_right_borders_to_right(proximity=proximity)
+            .align_left_borders_to_left(proximity=proximity)
             .mirror_horizontally()
-            .align_right_borders_to_right(proximity=proximity)
+            .align_left_borders_to_left(proximity=proximity)
             .mirror_vertically()
             .rotate_counterclockwise()
         )
 
-    def align_right_borders_to_right(self, *, proximity: int = 1) -> "TileGrid":
+    def align_left_borders_to_left(self, *, proximity: int = 1) -> "TileGrid":
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
 
         curr = self
         for tile in self.tiles:
-            curr = curr.align_below_tile_right_border_to_right(
+            curr = curr.align_below_tile_left_border_to_left(
                 handle=tile.handle, proximity=proximity
             )
 
         return curr
 
-    def align_below_tile_right_border_to_right(
+    def align_below_tile_left_border_to_left(
         self, *, handle: IntHandle, proximity: int = 1
     ) -> "TileGrid":
         assert proximity >= 0, f"{proximity=}, expected `proximity >= 0`"
@@ -1163,25 +1163,25 @@ class TileGrid:
         tile = self.get_tile_by_handle(handle)
         tc = tile.as_corners()
 
-        max_x: int | None = None
+        min_x: int | None = None
         tile_2: Tile | None = None
-        for t2 in self.tiles:
-            tc2 = t2.as_corners()
+        for _tile_2 in self.tiles:
+            tc2 = _tile_2.as_corners()
             if (
                 (tc2.c0.y == tc.c3.y + 1)
-                and (tc.c3.x >= tc2.c3.x)
-                and (tc.c0.x <= tc2.c3.x)
-                and ((tc.c3.x - tc2.c3.x) <= proximity)
-                and ((max_x is None) or (tc2.c3.x > max_x))
+                and (tc.c0.x <= tc2.c0.x)
+                and (tc.c3.x >= tc2.c0.x)
+                and ((tc2.c0.x - tc.c0.x) <= proximity)
+                and ((min_x is None) or (tc2.c3.x < min_x))
             ):
-                max_x = tc2.c3.x
-                tile_2 = t2
+                min_x = tc2.c0.x
+                tile_2 = _tile_2
 
         if tile_2 is None:
             return self
 
-        delta_x = tc.c3.x - tile_2.as_corners().c3.x
-        shared_borders = self.get_longest_vertical_right_border(tile_2.handle)
+        delta_x = tc.c0.x - tile_2.as_corners().c0.x
+        shared_borders = self.get_longest_left_border(tile_2.handle)
         return self.replace_tiles(
             itertools.chain(
                 (t.corners_c3_add(Cell(delta_x, 0)) for t in shared_borders.left),
@@ -1189,46 +1189,43 @@ class TileGrid:
             )
         )
 
-    def get_vertical_right_border(
-        self, handle: IntHandle, *, mode: BorderMode
-    ) -> SharedBorders:
-        # TODO: Make it left
+    def get_left_border(self, handle: IntHandle, *, mode: BorderMode) -> SharedBorders:
         match mode:
             case BorderMode.SHORTEST:
-                return self.get_shortest_vertical_right_border(handle)
+                return self.get_shortest_left_border(handle)
             case BorderMode.LONGEST:
-                return self.get_longest_vertical_right_border(handle)
+                return self.get_longest_left_border(handle)
 
-    def get_shortest_vertical_right_border(self, handle: IntHandle) -> SharedBorders:
+    def get_shortest_left_border(self, handle: IntHandle) -> SharedBorders:
         tile = self.get_tile_by_handle(handle)
         tc = tile.as_corners()
         tiles = self.tiles
 
-        possible_left = [t for t in tiles if tc.c3.x == t.as_corners().c3.x]
-        possible_right = [t for t in tiles if tc.c3.x + 1 == t.as_corners().c0.x]
+        possible_left = [t for t in tiles if tc.c0.x - 1 == t.as_corners().c3.x]
+        possible_right = [t for t in tiles if tc.c0.x == t.as_corners().c0.x]
 
-        if not possible_right:
-            return SharedBorders(left=frozenset(possible_left), right=frozenset())
+        if not possible_left:
+            return SharedBorders(left=frozenset(), right=frozenset(possible_right))
 
         y_min: int = tc.c0.y
         y_max: int = tc.c3.y
 
         left_and_right_swapped: bool = False
-        tiles_left: set[Tile] = {tile}
-        tiles_right: set[Tile] = set()
+        tiles_left: set[Tile] = set()
+        tiles_right: set[Tile] = {tile}
         while True:
             detector = Tile.build(
                 TileAsCorners(
-                    Cell(x=tc.c3.x, y=y_min),
-                    Cell(x=tc.c3.x + 1, y=y_max),
+                    Cell(x=tc.c0.x - 1, y=y_min),
+                    Cell(x=tc.c0.x, y=y_max),
                 )
             )
-            for tile_right in possible_right:
-                if tile_right.intersection(detector) is not None:
-                    tiles_right.add(tile_right)
+            for tile_left in possible_left:
+                if tile_left.intersection(detector) is not None:
+                    tiles_left.add(tile_left)
 
-            new_y_min = min(t.as_corners().c0.y for t in tiles_right)
-            new_y_max = max(t.as_corners().c3.y for t in tiles_right)
+            new_y_min = min(t.as_corners().c0.y for t in tiles_left)
+            new_y_max = max(t.as_corners().c3.y for t in tiles_left)
 
             if (new_y_min, new_y_max) == (y_min, y_max):
                 break
@@ -1244,23 +1241,21 @@ class TileGrid:
 
         return SharedBorders(left=frozenset(tiles_left), right=frozenset(tiles_right))
 
-    def get_longest_vertical_right_border(self, handle: IntHandle) -> SharedBorders:
-        shared_borders = self.get_shortest_vertical_right_border(handle)
+    def get_longest_left_border(self, handle: IntHandle) -> SharedBorders:
+        shared_borders = self.get_shortest_left_border(handle)
 
         while True:
-            a = min(shared_borders.left, key=lambda t: t.as_corners().c0.y)
-            b = max(shared_borders.left, key=lambda t: t.as_corners().c3.y)
+            a = min(shared_borders.right, key=lambda t: t.as_corners().c0.y)
+            b = max(shared_borders.right, key=lambda t: t.as_corners().c3.y)
 
             break_ = True
             for tile in self.tiles:
-                if (tile.as_4_corners()[3] == (a.as_4_corners()[1] + Cell(0, -1))) or (
-                    tile.as_4_corners()[1] == (b.as_4_corners()[3] + Cell(0, 1))
+                if (tile.as_4_corners()[2] == (a.as_4_corners()[0] + Cell(0, -1))) or (
+                    tile.as_4_corners()[0] == (b.as_4_corners()[2] + Cell(0, 1))
                 ):
                     break_ = False
-                    left_right = self.get_shortest_vertical_right_border(tile.handle)
-                    shared_borders = SharedBorders(
-                        left=shared_borders.left | left_right.left,
-                        right=shared_borders.right | left_right.right,
+                    shared_borders = shared_borders.union(
+                        self.get_shortest_left_border(tile.handle)
                     )
 
             if break_:
@@ -1284,20 +1279,18 @@ class TileGrid:
         as4c = tile.as_4_corners()
 
         closest_edge = closest(
-            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
+            to=cell.x, out_of=(as4c[0].x - 1, as4c[1].x), proximity=proximity
         )
         if closest_edge is None:
             vertical_borders = SharedBorders.empty()
-        elif cell.x < closest_edge:
-            vertical_borders = grid.get_vertical_right_border(tile.handle, mode=mode)
+        elif cell.x > closest_edge:
+            vertical_borders = grid.get_left_border(tile.handle, mode=mode)
         else:
-            new_tile = grid.try_get_tile_by_cell(Cell(as4c[0].x - 1, cell.y))
+            new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
             if new_tile is None:
                 vertical_borders = SharedBorders.empty()
             else:
-                vertical_borders = grid.get_vertical_right_border(
-                    new_tile.handle, mode=mode
-                )
+                vertical_borders = grid.get_left_border(new_tile.handle, mode=mode)
 
         cell = cell.rotate_counterclockwise()
         tile = tile.rotate_counterclockwise()
@@ -1305,20 +1298,18 @@ class TileGrid:
         as4c = tile.as_4_corners()
 
         closest_edge = closest(
-            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
+            to=cell.x, out_of=(as4c[0].x - 1, as4c[1].x), proximity=proximity
         )
         if closest_edge is None:
             horizontal_borders = SharedBorders.empty()
-        elif cell.x < closest_edge:
-            horizontal_borders = grid.get_vertical_right_border(tile.handle, mode=mode)
+        elif cell.x > closest_edge:
+            horizontal_borders = grid.get_left_border(tile.handle, mode=mode)
         else:
-            new_tile = grid.try_get_tile_by_cell(Cell(as4c[0].x - 1, cell.y))
+            new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
             if new_tile is None:
                 horizontal_borders = SharedBorders.empty()
             else:
-                horizontal_borders = grid.get_vertical_right_border(
-                    new_tile.handle, mode=mode
-                )
+                horizontal_borders = grid.get_left_border(new_tile.handle, mode=mode)
 
         shared_borders = SharedBorders(
             left=vertical_borders.left,
