@@ -82,6 +82,12 @@ class Cell:
             y=self.y - other.y,
         )
 
+    def mirror_horizontally(self) -> "Cell":
+        return Cell(x=-self.x, y=self.y)
+
+    def mirror_vertically(self) -> "Cell":
+        return Cell(x=self.x, y=-self.y)
+
     def rotate_clockwise(self) -> "Cell":
         return Cell(x=-self.y, y=self.x)
 
@@ -100,12 +106,6 @@ class Cell:
                 return self.rotate_counterclockwise()
             case _:
                 raise Unreachable
-
-    def mirror_horizontally(self) -> "Cell":
-        return Cell(x=-self.x, y=self.y)
-
-    def mirror_vertically(self) -> "Cell":
-        return Cell(x=self.x, y=-self.y)
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,13 +209,6 @@ class Tile:
 
         return Tile(tile=arg.normalize(), handle=handle)
 
-    def replace_tile(self, arg: TileAsCorners | TileAsStep) -> "Tile":
-        return Tile.build(arg, handle=self.handle)
-
-    @staticmethod
-    def from_cells(cells: Iterable[Cell]) -> "Tile":
-        return get_box(Tile.build(TileAsCorners(c1=cell, c4=cell)) for cell in cells)
-
     def as_corners(self) -> TileAsCornersNormalized:
         return self.tile
 
@@ -239,9 +232,27 @@ class Tile:
             )
         )
 
-    def area(self) -> int:
-        s = self.as_span()
-        return s.span.x * s.span.y
+    def as_4_corners(self) -> tuple[Cell, Cell, Cell, Cell]:
+        """
+        Returns corner cells with these indexes:
+        ```
+        0--1
+        |  |
+        2--3
+        ```
+        """
+
+        self_s = self.as_step()
+
+        return (
+            self_s.cell,
+            self_s.cell + dataclasses.replace(self_s.step, y=0),
+            self_s.cell + dataclasses.replace(self_s.step, x=0),
+            self_s.cell + self_s.step,
+        )
+
+    def replace_tile(self, arg: TileAsCorners | TileAsStep) -> "Tile":
+        return Tile.build(arg, handle=self.handle)
 
     def corners_c1_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
@@ -250,6 +261,65 @@ class Tile:
     def corners_c4_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
         return self.replace_tile(TileAsCorners(c1=tc.c1, c4=tc.c4 + cell))
+
+    def translate(self, *, delta: Cell) -> "Tile":
+        return self.replace_tile(
+            TileAsCorners(
+                c1=self.as_corners().c1 + delta,
+                c4=self.as_corners().c4 + delta,
+            )
+        )
+
+    def mirror_horizontally(self) -> "Tile":
+        return self.replace_tile(
+            TileAsCorners(
+                c1=self.as_corners().c1.mirror_horizontally(),
+                c4=self.as_corners().c4.mirror_horizontally(),
+            )
+        )
+
+    def mirror_vertically(self) -> "Tile":
+        return self.replace_tile(
+            TileAsCorners(
+                c1=self.as_corners().c1.mirror_vertically(),
+                c4=self.as_corners().c4.mirror_vertically(),
+            )
+        )
+
+    def mirror(self, orientation: "Orientation") -> "Tile":
+        match orientation:
+            case Orientation.HORIZONTAL:
+                return self.mirror_horizontally()
+            case Orientation.VERTICAL:
+                return self.mirror_vertically()
+
+    def rotate_clockwise(self) -> "Tile":
+        return self.replace_tile(
+            TileAsCorners(
+                c1=self.as_corners().c1.rotate_clockwise(),
+                c4=self.as_corners().c4.rotate_clockwise(),
+            )
+        )
+
+    def rotate_counterclockwise(self) -> "Tile":
+        return self.replace_tile(
+            TileAsCorners(
+                c1=self.as_corners().c1.rotate_counterclockwise(),
+                c4=self.as_corners().c4.rotate_counterclockwise(),
+            )
+        )
+
+    def rotate(self, side: CardinalDirection, /, *, to: CardinalDirection) -> "Tile":
+        return self.replace_tile(
+            TileAsCorners(
+                c1=self.as_corners().c1.rotate(side, to=to),
+                c4=self.as_corners().c4.rotate(side, to=to),
+            )
+        )
+
+    @staticmethod
+    def from_cells(cells: Iterable[Cell]) -> "Tile":
+        return get_box(Tile.build(TileAsCorners(c1=cell, c4=cell)) for cell in cells)
 
     def contains_cell(self, cell: Cell) -> bool:
         c = self.as_corners()
@@ -313,95 +383,9 @@ class Tile:
             )
         )
 
-    def shred_vertically(self) -> tuple["Line", ...]:
-        tile = self.as_corners()
-
-        return tuple(
-            Line(coordinate=x, orientation=Orientation.VERTICAL)
-            for x in range(tile.c1.x, tile.c4.x + 1)
-        )
-
-    def shred_horizontally(self) -> tuple["Line", ...]:
-        tile = self.as_corners()
-
-        return tuple(
-            Line(coordinate=y, orientation=Orientation.HORIZONTAL)
-            for y in range(tile.c1.y, tile.c4.y + 1)
-        )
-
-    def rotate_clockwise(self) -> "Tile":
-        return self.replace_tile(
-            TileAsCorners(
-                c1=self.as_corners().c1.rotate_clockwise(),
-                c4=self.as_corners().c4.rotate_clockwise(),
-            )
-        )
-
-    def rotate_counterclockwise(self) -> "Tile":
-        return self.replace_tile(
-            TileAsCorners(
-                c1=self.as_corners().c1.rotate_counterclockwise(),
-                c4=self.as_corners().c4.rotate_counterclockwise(),
-            )
-        )
-
-    def rotate(self, side: CardinalDirection, /, *, to: CardinalDirection) -> "Tile":
-        return self.replace_tile(
-            TileAsCorners(
-                c1=self.as_corners().c1.rotate(side, to=to),
-                c4=self.as_corners().c4.rotate(side, to=to),
-            )
-        )
-
-    def mirror_horizontally(self) -> "Tile":
-        return self.replace_tile(
-            TileAsCorners(
-                c1=self.as_corners().c1.mirror_horizontally(),
-                c4=self.as_corners().c4.mirror_horizontally(),
-            )
-        )
-
-    def mirror_vertically(self) -> "Tile":
-        return self.replace_tile(
-            TileAsCorners(
-                c1=self.as_corners().c1.mirror_vertically(),
-                c4=self.as_corners().c4.mirror_vertically(),
-            )
-        )
-
-    def mirror(self, orientation: "Orientation") -> "Tile":
-        match orientation:
-            case Orientation.HORIZONTAL:
-                return self.mirror_horizontally()
-            case Orientation.VERTICAL:
-                return self.mirror_vertically()
-
-    def translate(self, *, delta: Cell) -> "Tile":
-        return self.replace_tile(
-            TileAsCorners(
-                c1=self.as_corners().c1 + delta,
-                c4=self.as_corners().c4 + delta,
-            )
-        )
-
-    def as_4_corners(self) -> tuple[Cell, Cell, Cell, Cell]:
-        """
-        Returns corner cells with these indexes:
-        ```
-        0--1
-        |  |
-        2--3
-        ```
-        """
-
-        self_s = self.as_step()
-
-        return (
-            self_s.cell,
-            self_s.cell + dataclasses.replace(self_s.step, y=0),
-            self_s.cell + dataclasses.replace(self_s.step, x=0),
-            self_s.cell + self_s.step,
-        )
+    def area(self) -> int:
+        s = self.as_span()
+        return s.span.x * s.span.y
 
     def un_occupy(self, area: "Tile", /, *, prefer: "Orientation") -> "Tile | None":
         curr: "Tile | None" = self
@@ -466,6 +450,22 @@ class Tile:
             curr = curr.mirror_vertically()
 
         return curr
+
+    def shred_vertically(self) -> tuple["Line", ...]:
+        tile = self.as_corners()
+
+        return tuple(
+            Line(coordinate=x, orientation=Orientation.VERTICAL)
+            for x in range(tile.c1.x, tile.c4.x + 1)
+        )
+
+    def shred_horizontally(self) -> tuple["Line", ...]:
+        tile = self.as_corners()
+
+        return tuple(
+            Line(coordinate=y, orientation=Orientation.HORIZONTAL)
+            for y in range(tile.c1.y, tile.c4.y + 1)
+        )
 
 
 def get_box(tiles: Iterable[Tile]) -> Tile:
