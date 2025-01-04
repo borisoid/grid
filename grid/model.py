@@ -1279,11 +1279,11 @@ class TileGrid:
         as4c = tile.as_4_corners()
 
         closest_edge = closest(
-            to=cell.x, out_of=(as4c[0].x - 1, as4c[1].x), proximity=proximity
+            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
             vertical_borders = SharedBorders.empty()
-        elif cell.x > closest_edge:
+        elif cell.x >= closest_edge:
             vertical_borders = grid.get_left_border(tile.handle, mode=mode)
         else:
             new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
@@ -1298,11 +1298,11 @@ class TileGrid:
         as4c = tile.as_4_corners()
 
         closest_edge = closest(
-            to=cell.x, out_of=(as4c[0].x - 1, as4c[1].x), proximity=proximity
+            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
             horizontal_borders = SharedBorders.empty()
-        elif cell.x > closest_edge:
+        elif cell.x >= closest_edge:
             horizontal_borders = grid.get_left_border(tile.handle, mode=mode)
         else:
             new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
