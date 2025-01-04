@@ -1128,6 +1128,8 @@ class TileGrid:
 
     def get_longest_left_border(self, handle: IntHandle) -> SharedBorders:
         shared_borders = self.get_shortest_left_border(handle)
+        if shared_borders == SharedBorders():
+            return shared_borders
 
         while True:
             a = min(shared_borders.right, key=lambda t: t.as_corners().c0.y)
