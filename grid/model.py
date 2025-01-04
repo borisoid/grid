@@ -489,10 +489,6 @@ class SharedBorders:
     top: frozenset[Tile] = frozenset()
     bottom: frozenset[Tile] = frozenset()
 
-    @staticmethod
-    def empty() -> "SharedBorders":
-        return SharedBorders(frozenset(), frozenset(), frozenset(), frozenset())
-
     def check(self) -> None:
         # TODO: Check if all edges align
         raise NotImplementedError
@@ -1094,7 +1090,7 @@ class TileGrid:
         possible_right = [t for t in tiles if tc.c0.x == t.as_corners().c0.x]
 
         if not possible_left:
-            return SharedBorders(left=frozenset(), right=frozenset(possible_right))
+            return SharedBorders()
 
         y_min: int = tc.c0.y
         y_max: int = tc.c3.y
@@ -1162,7 +1158,7 @@ class TileGrid:
     ) -> SharedBorders:
         tile = self.try_get_tile_by_cell(cell)
         if tile is None:
-            return SharedBorders.empty()
+            return SharedBorders()
 
         def get_vertical_border(
             *, cell: Cell, tile: Tile, grid: TileGrid
@@ -1173,13 +1169,13 @@ class TileGrid:
                 to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
             )
             if closest_edge is None:
-                return SharedBorders.empty()
+                return SharedBorders()
             elif cell.x >= closest_edge:
                 return grid.get_left_border(tile.handle, mode=mode)
             else:
                 new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
                 if new_tile is None:
-                    return SharedBorders.empty()
+                    return SharedBorders()
                 else:
                     return grid.get_left_border(new_tile.handle, mode=mode)
 

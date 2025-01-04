@@ -91,6 +91,4 @@ def test_6() -> None:
     t6 = Tile.build(TileAsCorners(Cell(0, 11), Cell(10, 11)))
     g = TileGrid((t1, t2, t3, t4, t5, t6))
 
-    assert g.get_shortest_left_border(1) == SharedBorders(
-        frozenset(), frozenset({t3, t4, t5, t6})
-    )
+    assert g.get_shortest_left_border(1) == SharedBorders()
