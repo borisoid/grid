@@ -429,17 +429,6 @@ def main_loop() -> None:
                         mode = Mode.SPLIT_RIGHT
                         print(f"Mode: {mode.value}")
 
-                    case pg.K_0:
-                        tile_grid = tile_grid.compact()
-                        tile_grid = tile_grid.expand()
-                        tile_grid = tile_grid.compact()
-
-                    case pg.K_m:  # Minimize
-                        tile_grid = tile_grid.compact()
-
-                    case pg.K_e:
-                        tile_grid = tile_grid.expand()
-
                     case pg.K_a:
                         tile_grid = tile_grid.align_borders(proximity=3)
                         # tile_grid = tile_grid.snap_2_edges(handle=0, proximity=3)

@@ -460,22 +460,6 @@ class Tile:
 
         return curr
 
-    def shred_vertically(self) -> tuple["Line", ...]:
-        tile = self.as_corners()
-
-        return tuple(
-            Line(coordinate=x, orientation=Orientation.VERTICAL)
-            for x in range(tile.c0.x, tile.c3.x + 1)
-        )
-
-    def shred_horizontally(self) -> tuple["Line", ...]:
-        tile = self.as_corners()
-
-        return tuple(
-            Line(coordinate=y, orientation=Orientation.HORIZONTAL)
-            for y in range(tile.c0.y, tile.c3.y + 1)
-        )
-
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class TileGridInvariantErrorContainer:
@@ -754,101 +738,6 @@ class TileGrid:
             return self
 
         return TileGrid.from_(t for t in self.tiles if t.handle != handle)
-
-    def compact(self) -> "TileGrid":
-        current_grid = self
-
-        box = self.get_box()
-
-        for line in itertools.chain(
-            sorted(
-                box.shred_horizontally(), key=lambda ln: ln.coordinate, reverse=True
-            ),
-            sorted(box.shred_vertically(), key=lambda ln: ln.coordinate, reverse=True),
-        ):
-            delta = {
-                Orientation.HORIZONTAL: Cell(x=0, y=-1),
-                Orientation.VERTICAL: Cell(x=-1, y=0),
-            }[line.orientation]
-
-            new_tiles: list[Tile] = []
-            for tile in current_grid.tiles:
-                if line.fully_contains_tile(tile):
-                    break
-                elif not line.intersects_tile(tile):
-                    if line.on_positive_side_of_tile(tile):
-                        new_tiles.append(tile)
-                    elif line.on_negative_side_of_tile(tile):
-                        new_tiles.append(
-                            tile.replace_tile(
-                                TileAsCorners(
-                                    c0=tile.as_corners().c0 + delta,
-                                    c3=tile.as_corners().c3 + delta,
-                                )
-                            )
-                        )
-                else:
-                    new_tiles.append(
-                        tile.replace_tile(
-                            TileAsCorners(
-                                c0=tile.as_corners().c0,
-                                c3=tile.as_corners().c3 + delta,
-                            )
-                        )
-                    )
-
-            else:  # only executed if the loop did NOT break
-                current_grid = TileGrid.from_(new_tiles)
-
-        return current_grid
-
-    def expand(self) -> "TileGrid":
-        tiles = tuple(self.tiles)
-        box = get_box(tiles)
-        new_tiles = list(tiles)
-        for i, tile in enumerate(tiles):
-            current_tiles = new_tiles[:i] + new_tiles[i + 1 :]
-
-            for new_tile in (
-                # Right
-                tile.replace_tile(
-                    TileAsCorners(
-                        c0=tile.as_corners().c0,
-                        c3=tile.as_corners().c3 + Cell(x=1, y=0),
-                    )
-                ),
-                # Down
-                tile.replace_tile(
-                    TileAsCorners(
-                        c0=tile.as_corners().c0,
-                        c3=tile.as_corners().c3 + Cell(x=0, y=1),
-                    )
-                ),
-                # Left
-                tile.replace_tile(
-                    TileAsCorners(
-                        c0=tile.as_corners().c0 + Cell(x=-1, y=0),
-                        c3=tile.as_corners().c3,
-                    )
-                ),
-                # Up
-                tile.replace_tile(
-                    TileAsCorners(
-                        c0=tile.as_corners().c0 + Cell(x=0, y=-1),
-                        c3=tile.as_corners().c3,
-                    )
-                ),
-            ):
-                if (box.contains_tile(new_tile)) and (
-                    not any(x.intersects_with(new_tile) for x in current_tiles)
-                ):
-                    new_tiles[i] = new_tile
-                    break
-
-            else:  # only executed if the loop did NOT break
-                new_tiles[i] = tile
-
-        return TileGrid.from_(new_tiles)
 
     def insert(
         self,
