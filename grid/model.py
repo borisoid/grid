@@ -12,7 +12,6 @@ import itertools
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from enum import Enum, IntEnum, auto
-from types import MappingProxyType
 from typing import Iterable, Literal, NewType, overload
 
 from kiwisolver import Expression, Solver, Variable
@@ -50,19 +49,29 @@ class GridSection(Enum):
     BOTTOM_LEFT = auto()
     BOTTOM_RIGHT = auto()
 
+    def invert(self) -> "GridSection":
+        return {
+            GridSection.TOP: GridSection.BOTTOM,
+            GridSection.BOTTOM: GridSection.TOP,
+            GridSection.LEFT: GridSection.RIGHT,
+            GridSection.RIGHT: GridSection.LEFT,
+            GridSection.TOP_LEFT: GridSection.BOTTOM_RIGHT,
+            GridSection.TOP_RIGHT: GridSection.BOTTOM_LEFT,
+            GridSection.BOTTOM_LEFT: GridSection.TOP_RIGHT,
+            GridSection.BOTTOM_RIGHT: GridSection.TOP_LEFT,
+        }[self]
 
-grid_section_inverse = MappingProxyType(
-    {
-        GridSection.TOP: GridSection.BOTTOM,
-        GridSection.BOTTOM: GridSection.TOP,
-        GridSection.LEFT: GridSection.RIGHT,
-        GridSection.RIGHT: GridSection.LEFT,
-        GridSection.TOP_LEFT: GridSection.BOTTOM_RIGHT,
-        GridSection.TOP_RIGHT: GridSection.BOTTOM_LEFT,
-        GridSection.BOTTOM_LEFT: GridSection.TOP_RIGHT,
-        GridSection.BOTTOM_RIGHT: GridSection.TOP_LEFT,
-    }
-)
+
+class Orientation(Enum):
+    HORIZONTAL = auto()
+    VERTICAL = auto()
+
+    def invert(self) -> "Orientation":
+        return (
+            Orientation.VERTICAL
+            if self == Orientation.HORIZONTAL
+            else Orientation.HORIZONTAL
+        )
 
 
 @dataclass(frozen=True, slots=True, eq=True)
@@ -286,7 +295,7 @@ class Tile:
             )
         )
 
-    def mirror(self, orientation: "Orientation") -> "Tile":
+    def mirror(self, orientation: Orientation) -> "Tile":
         match orientation:
             case Orientation.HORIZONTAL:
                 return self.mirror_horizontally()
@@ -387,7 +396,7 @@ class Tile:
         s = self.as_span()
         return s.span.x * s.span.y
 
-    def un_occupy(self, area: "Tile", /, *, prefer: "Orientation") -> "Tile | None":
+    def un_occupy(self, area: "Tile", /, *, prefer: Orientation) -> "Tile | None":
         curr: "Tile | None" = self
         assert curr is not None
 
@@ -466,21 +475,6 @@ class Tile:
             Line(coordinate=y, orientation=Orientation.HORIZONTAL)
             for y in range(tile.c0.y, tile.c3.y + 1)
         )
-
-
-def get_box(tiles: Iterable[Tile]) -> Tile:
-    tiles = tuple(tiles)
-
-    def reducer(a: Tile, b: Tile) -> Tile:
-        return a.min_max(b)
-
-    return functools.reduce(reducer, tiles, tiles[0])
-
-
-def get_ys(tiles: Iterable[Tile]) -> set[int]:
-    return set(
-        itertools.chain(*((t.c0.y, t.c3.y) for t in (t.as_corners() for t in tiles)))
-    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -629,16 +623,16 @@ class SharedBorders:
             bottom=frozenset(tile.mirror_vertically() for tile in self.top),
         )
 
-    def get_cross_cell(self) -> Cell | None:
+    def get_cross_cell(self, *, strict: bool = False) -> Cell | None:
         vertical, horizontal = self.as_tiles()
 
         if (vertical is None) and (horizontal is None):
             return None
 
-        if (vertical is None) and (horizontal is not None):
+        if (vertical is None) and (horizontal is not None) and not strict:
             return horizontal.as_corners().c0
 
-        if (vertical is not None) and (horizontal is None):
+        if (vertical is not None) and (horizontal is None) and not strict:
             return vertical.as_corners().c0
 
         if (vertical is not None) and (horizontal is not None):
@@ -1116,7 +1110,7 @@ class TileGrid:
     def get_ys(self) -> set[int]:
         return get_ys(self.tiles)
 
-    def un_occupy(self, area: "Tile", /, *, prefer: "Orientation") -> "TileGrid | None":
+    def un_occupy(self, area: "Tile", /, *, prefer: Orientation) -> "TileGrid | None":
         tiles: list[Tile] = []
         for tile in self.tiles:
             processed_tile = tile.un_occupy(area, prefer=prefer)
@@ -1198,6 +1192,7 @@ class TileGrid:
     def get_vertical_right_border(
         self, handle: IntHandle, *, mode: BorderMode
     ) -> SharedBorders:
+        # TODO: Make it left
         match mode:
             case BorderMode.SHORTEST:
                 return self.get_shortest_vertical_right_border(handle)
@@ -1286,17 +1281,17 @@ class TileGrid:
             return SharedBorders.empty()
 
         grid = self
-        a4c = tile.as_4_corners()
+        as4c = tile.as_4_corners()
 
         closest_edge = closest(
-            to=cell.x, out_of=(a4c[0].x, a4c[1].x + 1), proximity=proximity
+            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
             vertical_borders = SharedBorders.empty()
         elif cell.x < closest_edge:
             vertical_borders = grid.get_vertical_right_border(tile.handle, mode=mode)
         else:
-            new_tile = grid.try_get_tile_by_cell(Cell(a4c[0].x - 1, cell.y))
+            new_tile = grid.try_get_tile_by_cell(Cell(as4c[0].x - 1, cell.y))
             if new_tile is None:
                 vertical_borders = SharedBorders.empty()
             else:
@@ -1307,17 +1302,17 @@ class TileGrid:
         cell = cell.rotate_counterclockwise()
         tile = tile.rotate_counterclockwise()
         grid = grid.rotate_counterclockwise()
-        a4c = tile.as_4_corners()
+        as4c = tile.as_4_corners()
 
         closest_edge = closest(
-            to=cell.x, out_of=(a4c[0].x, a4c[1].x + 1), proximity=proximity
+            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
         )
         if closest_edge is None:
             horizontal_borders = SharedBorders.empty()
         elif cell.x < closest_edge:
             horizontal_borders = grid.get_vertical_right_border(tile.handle, mode=mode)
         else:
-            new_tile = grid.try_get_tile_by_cell(Cell(a4c[0].x - 1, cell.y))
+            new_tile = grid.try_get_tile_by_cell(Cell(as4c[0].x - 1, cell.y))
             if new_tile is None:
                 horizontal_borders = SharedBorders.empty()
             else:
@@ -1349,16 +1344,14 @@ class TileGrid:
         if not (v1 == h1 or v1 == h2 or v2 == h1 or v2 == h2):
             return shared_borders
 
-        delta = Cell(
-            x=-1 if h1 in (v1, v2) else 1,
-            y=-1 if v1 in (h1, h2) else 1,
-        )
-
         intersection = vertical.intersection(horizontal)
         if intersection is None:
             raise Unreachable
 
-        new_base_cell = intersection.as_corners().c0 + delta
+        new_base_cell = intersection.as_corners().c0 + Cell(
+            x=-1 if h1 in (v1, v2) else 1,
+            y=-1 if v1 in (h1, h2) else 1,
+        )
 
         return self.get_shared_borders_near(
             new_base_cell,
@@ -1459,23 +1452,23 @@ class BorderDragCache:
         if cross_cell is None:
             return self.grid, self.borders
 
-        cdx = 0  # Current Delta X
+        current_delta_x = 0
         if delta.x > 0:
-            cdx = clamp(delta.x, delta.x, self.max_delta_right)
+            current_delta_x = clamp(delta.x, delta.x, self.max_delta_right)
         elif delta.x < 0:
-            cdx = clamp(delta.x, -self.max_delta_left, delta.x)
+            current_delta_x = clamp(delta.x, -self.max_delta_left, delta.x)
 
-        cdy = 0  # Current Delta Y
+        current_delta_y = 0
         if delta.y > 0:
-            cdy = clamp(delta.y, delta.y, self.max_delta_bottom)
+            current_delta_y = clamp(delta.y, delta.y, self.max_delta_bottom)
         elif delta.y < 0:
-            cdy = clamp(delta.y, -self.max_delta_top, delta.y)
+            current_delta_y = clamp(delta.y, -self.max_delta_top, delta.y)
 
-        cd = Cell(cdx, cdy)  # Current Delta
-        current_cross_cell = cross_cell + cd
+        current_delta = Cell(current_delta_x, current_delta_y)
+        current_cross_cell = cross_cell + current_delta
 
         # Snap {{{
-        cd += Cell(
+        current_delta += Cell(
             x=min(
                 (
                     x - current_cross_cell.x
@@ -1503,16 +1496,16 @@ class BorderDragCache:
         borders = borders.pull_coords(grid)
         grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c3_add(Cell(cd.x, 0)) for t in borders.left),
-                (t.corners_c0_add(Cell(cd.x, 0)) for t in borders.right),
+                (t.corners_c3_add(Cell(current_delta.x, 0)) for t in borders.left),
+                (t.corners_c0_add(Cell(current_delta.x, 0)) for t in borders.right),
             )
         )
 
         borders = borders.pull_coords(grid)
         grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c3_add(Cell(0, cd.y)) for t in borders.top),
-                (t.corners_c0_add(Cell(0, cd.y)) for t in borders.bottom),
+                (t.corners_c3_add(Cell(0, current_delta.y)) for t in borders.top),
+                (t.corners_c0_add(Cell(0, current_delta.y)) for t in borders.bottom),
             )
         )
 
@@ -1568,40 +1561,6 @@ class BorderDragCache:
                 return_.add(intersection.as_corners().c0.x)
 
         return return_
-
-
-def clamp(num: int, min: int, max: int) -> int:
-    if num > max:
-        return max
-
-    if num < min:
-        return min
-
-    return num
-
-
-def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
-    number, distance = min(
-        ((n, abs(n - to)) for n in out_of),
-        key=lambda a: a[1],
-    )
-
-    return None if distance > proximity else number
-
-
-# Line {{{
-
-
-class Orientation(Enum):
-    HORIZONTAL = auto()
-    VERTICAL = auto()
-
-    def invert(self) -> "Orientation":
-        return (
-            Orientation.VERTICAL
-            if self == Orientation.HORIZONTAL
-            else Orientation.HORIZONTAL
-        )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1683,7 +1642,38 @@ class Line:
         )
 
 
-# }}} Line
+def get_box(tiles: Iterable[Tile]) -> Tile:
+    tiles = tuple(tiles)
+
+    def reducer(a: Tile, b: Tile) -> Tile:
+        return a.min_max(b)
+
+    return functools.reduce(reducer, tiles, tiles[0])
+
+
+def get_ys(tiles: Iterable[Tile]) -> set[int]:
+    return set(
+        itertools.chain(*((t.c0.y, t.c3.y) for t in (t.as_corners() for t in tiles)))
+    )
+
+
+def clamp(num: int, min: int, max: int) -> int:
+    if num > max:
+        return max
+
+    if num < min:
+        return min
+
+    return num
+
+
+def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
+    number, distance = min(
+        ((n, abs(n - to)) for n in out_of),
+        key=lambda a: a[1],
+    )
+
+    return None if distance > proximity else number
 
 
 def get_grid_section(*, cell: Cell, origin_tile: Tile) -> GridSection:
