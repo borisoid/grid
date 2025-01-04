@@ -1275,41 +1275,31 @@ class TileGrid:
         if tile is None:
             return SharedBorders.empty()
 
-        grid = self
-        as4c = tile.as_4_corners()
+        def get_vertical_border(
+            *, cell: Cell, tile: Tile, grid: TileGrid
+        ) -> SharedBorders:
+            as4c = tile.as_4_corners()
 
-        closest_edge = closest(
-            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
-        )
-        if closest_edge is None:
-            vertical_borders = SharedBorders.empty()
-        elif cell.x >= closest_edge:
-            vertical_borders = grid.get_left_border(tile.handle, mode=mode)
-        else:
-            new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
-            if new_tile is None:
-                vertical_borders = SharedBorders.empty()
+            closest_edge = closest(
+                to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
+            )
+            if closest_edge is None:
+                return SharedBorders.empty()
+            elif cell.x >= closest_edge:
+                return grid.get_left_border(tile.handle, mode=mode)
             else:
-                vertical_borders = grid.get_left_border(new_tile.handle, mode=mode)
+                new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
+                if new_tile is None:
+                    return SharedBorders.empty()
+                else:
+                    return grid.get_left_border(new_tile.handle, mode=mode)
 
-        cell = cell.rotate_counterclockwise()
-        tile = tile.rotate_counterclockwise()
-        grid = grid.rotate_counterclockwise()
-        as4c = tile.as_4_corners()
-
-        closest_edge = closest(
-            to=cell.x, out_of=(as4c[0].x, as4c[1].x + 1), proximity=proximity
+        vertical_borders = get_vertical_border(cell=cell, tile=tile, grid=self)
+        horizontal_borders = get_vertical_border(
+            cell=cell.rotate_counterclockwise(),
+            tile=tile.rotate_counterclockwise(),
+            grid=self.rotate_counterclockwise(),
         )
-        if closest_edge is None:
-            horizontal_borders = SharedBorders.empty()
-        elif cell.x >= closest_edge:
-            horizontal_borders = grid.get_left_border(tile.handle, mode=mode)
-        else:
-            new_tile = grid.try_get_tile_by_cell(Cell(as4c[1].x + 1, cell.y))
-            if new_tile is None:
-                horizontal_borders = SharedBorders.empty()
-            else:
-                horizontal_borders = grid.get_left_border(new_tile.handle, mode=mode)
 
         shared_borders = SharedBorders(
             left=vertical_borders.left,
