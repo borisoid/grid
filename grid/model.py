@@ -489,10 +489,6 @@ class SharedBorders:
     top: frozenset[Tile] = frozenset()
     bottom: frozenset[Tile] = frozenset()
 
-    def check(self) -> None:
-        # TODO: Check if all edges align
-        raise NotImplementedError
-
     def pull_coords(self, grid: "TileGrid") -> "SharedBorders":
         return SharedBorders(
             left=frozenset(
@@ -548,7 +544,6 @@ class SharedBorders:
         return get_box(tiles)
 
     def union(self, other: "SharedBorders") -> "SharedBorders":
-        # TODO: Make it respect only handles
         return SharedBorders(
             left=self.left.union(other.left),
             right=self.right.union(other.right),
@@ -751,9 +746,6 @@ class TileGrid:
         if self.tiles[0].handle == handle:
             # Origin must not be deleted
             return self
-
-        if len(set(order)) != len(order):
-            raise Exception  # TODO
 
         for direction in order:
             grid = self.rotate(direction, to=CardinalDirection.LEFT)
