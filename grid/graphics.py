@@ -487,7 +487,8 @@ def main_loop() -> None:
                             pass
 
                         case Mode.DELETE:
-                            tile_grid = tile_grid.delete_by_handle(selected_tile.handle)
+                            # tile_grid = tile_grid.delete_by_handle(selected_tile.handle)
+                            tile_grid = tile_grid.delete_and_close_gap(handle=selected_tile.handle)
 
                         case (
                             Mode.SPLIT_UP

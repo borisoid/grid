@@ -735,6 +735,58 @@ class TileGrid:
 
         return TileGrid.from_(t for t in self.tiles if t.handle != handle)
 
+    def delete_and_close_gap(
+        self,
+        *,
+        handle: IntHandle,
+        order: tuple[
+            CardinalDirection, CardinalDirection, CardinalDirection, CardinalDirection
+        ] = (
+            CardinalDirection.LEFT,
+            CardinalDirection.UP,
+            CardinalDirection.RIGHT,
+            CardinalDirection.DOWN,
+        ),
+    ) -> "TileGrid":
+        if self.tiles[0].handle == handle:
+            # Origin must not be deleted
+            return self
+
+        if len(set(order)) != len(order):
+            raise Exception  # TODO
+
+        for direction in order:
+            grid = self.rotate(direction, to=CardinalDirection.LEFT)
+
+            tile = grid.get_tile_by_handle(handle)
+            as_span = tile.as_span()
+            border = grid.get_shortest_left_border(handle)
+
+            if (
+                len([t for t in border.right if t.as_span().span.x <= as_span.span.x])
+                > 1
+            ) or (border == SharedBorders()):
+                continue
+
+            return (
+                grid.replace_tiles(
+                    itertools.chain(
+                        (
+                            t.corners_c3_add(Cell(as_span.span.x, 0))
+                            for t in border.left
+                        ),
+                        (
+                            t.corners_c0_add(Cell(as_span.span.x, 0))
+                            for t in border.right
+                        ),
+                    )
+                )
+                .delete_by_handle(handle)
+                .rotate(CardinalDirection.LEFT, to=direction)
+            )
+
+        return self
+
     def insert(
         self,
         *,
