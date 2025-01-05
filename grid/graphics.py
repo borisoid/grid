@@ -71,9 +71,19 @@ clock = pg.time.Clock()
 screen = pg.display.set_mode(pg.Vector2(WINDOW_WIDTH, WINDOW_HEIGHT))
 
 
-tile_colors: list[pg.Color] = []
-for i, color in zip(range(20), itertools.cycle((RED, GREEN_170, BLUE_150))):
-    tile_colors.append(color)
+def color_generator() -> Generator[pg.Color, None, None]:
+    yield from itertools.cycle((RED, GREEN_170, BLUE_150))
+
+
+COLOR_GENERATOR = color_generator()
+HANDLE_TO_COLOR: dict[IntHandle, pg.Color] = {}
+
+
+def get_color(*, handle: IntHandle) -> pg.Color:
+    if handle not in HANDLE_TO_COLOR:
+        HANDLE_TO_COLOR[handle] = next(COLOR_GENERATOR)
+
+    return HANDLE_TO_COLOR[handle]
 
 
 def handle_generator() -> Generator[IntHandle, None, None]:
@@ -195,11 +205,11 @@ def draw(
 
     # Tiles {{{
 
-    for tile, color in zip(tiles, tile_colors):
+    for tile in tiles:
         tile_as_step = tile.as_step()
         pg.draw.rect(
             surface=screen,
-            color=color,
+            color=get_color(handle=tile.handle),
             rect=pg.Rect(
                 (tile_as_step.cell.x * CELL_SIDE_LENGTH) + CELL_PADDING,
                 (tile_as_step.cell.y * CELL_SIDE_LENGTH) + CELL_PADDING,
@@ -488,7 +498,9 @@ def main_loop() -> None:
 
                         case Mode.DELETE:
                             # tile_grid = tile_grid.delete_by_handle(selected_tile.handle)
-                            tile_grid = tile_grid.delete_and_close_gap(handle=selected_tile.handle)
+                            tile_grid = tile_grid.delete_and_close_gap(
+                                handle=selected_tile.handle
+                            )
 
                         case (
                             Mode.SPLIT_UP
