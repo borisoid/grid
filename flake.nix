@@ -10,22 +10,22 @@
         devShells.${system}.default = (p.buildFHSEnv {
             name = "py-fhs-env";
             targetPkgs = p: let
-                pp = p.python313Packages;
+                pPy = p.python313Packages;
             in [
-                (pp.python.withPackages (ppp: [
-                    ppp.kiwisolver
-                    ppp.pygame
+                (pPy.python.withPackages (p: [
+                    p.kiwisolver
+                    p.pygame
 
-                    ppp.pytest
-                    ppp.ruff
+                    p.pytest
+                    p.ruff
 
-                    ppp.typing-extensions
-                    ppp.mypy
+                    p.typing-extensions
+                    p.mypy
                 ]))
                 p.pyright
             ];
 
-            runScript = "bash";
+            # runScript = "bash";
         }).env;
     };
 }
