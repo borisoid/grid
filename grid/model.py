@@ -952,7 +952,7 @@ class TileGrid:
 
         # Lines {{{
         tile_vars_groups: defaultdict[int, list[TileVar]] = defaultdict(list)
-        for y in self.get_ys():
+        for y in self.get_top_ys():
             line = Line(coordinate=y, orientation=Orientation.HORIZONTAL)
             for tile in tiles_sorted:
                 if line.intersects_tile(tile):
@@ -1036,8 +1036,8 @@ class TileGrid:
             for tile_var in (tile_vars[tile.handle] for tile in self.tiles)
         )
 
-    def get_ys(self) -> set[int]:
-        return get_ys(self.tiles)
+    def get_top_ys(self) -> set[int]:
+        return get_top_ys(self.tiles)
 
     def un_occupy(self, area: "Tile", /, *, prefer: Orientation) -> "TileGrid | None":
         tiles: list[Tile] = []
@@ -1564,10 +1564,11 @@ def get_box(tiles: Iterable[Tile]) -> Tile:
     return functools.reduce(reducer, tiles, tiles[0])
 
 
-def get_ys(tiles: Iterable[Tile]) -> set[int]:
-    return set(
-        itertools.chain(*((t.c0.y, t.c3.y) for t in (t.as_corners() for t in tiles)))
-    )
+def get_top_ys(tiles: Iterable[Tile]) -> set[int]:
+    return set(t.c0.y for t in (t.as_corners() for t in tiles))
+    # return set(
+    #     itertools.chain(*((t.c0.y, t.c3.y) for t in (t.as_corners() for t in tiles)))
+    # )
 
 
 def clamp(num: int, min: int, max: int) -> int:
