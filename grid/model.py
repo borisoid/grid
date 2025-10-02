@@ -10,9 +10,10 @@ import dataclasses
 import functools
 import itertools
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum, IntEnum, auto
-from typing import Iterable, Literal, NewType, overload
+from typing import Literal, NewType, overload
 
 from kiwisolver import Expression, Solver, Variable
 
@@ -520,8 +521,8 @@ class SharedBorders:
         return (
             (
                 Tile.from_cells(
-                    itertools.chain(
-                        *(tile.as_4_corners()[0:3:2] for tile in self.right)
+                    itertools.chain.from_iterable(
+                        tile.as_4_corners()[0:3:2] for tile in self.right
                     )
                 )
                 if self.right and self.left
@@ -529,7 +530,9 @@ class SharedBorders:
             ),
             (
                 Tile.from_cells(
-                    itertools.chain(*(tile.as_4_corners()[0:2] for tile in self.bottom))
+                    itertools.chain.from_iterable(
+                        tile.as_4_corners()[0:2] for tile in self.bottom
+                    )
                 )
                 if self.bottom and self.top
                 else None
