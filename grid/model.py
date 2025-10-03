@@ -1039,7 +1039,7 @@ class TileGrid:
             for tile_var in (tile_vars[tile.handle] for tile in self.tiles)
         )
 
-    def get_top_ys(self) -> set[int]:
+    def get_top_ys(self) -> frozenset[int]:
         return get_top_ys(self.tiles)
 
     def un_occupy(self, area: "Tile", /, *, prefer: Orientation) -> "TileGrid | None":
@@ -1430,13 +1430,13 @@ class BorderDragCache:
     @classmethod
     def _get_potential_snap_points(
         cls, *, grid: TileGrid, borders: SharedBorders
-    ) -> tuple[set[int], set[int]]:
+    ) -> tuple[frozenset[int], frozenset[int]]:
         """
         Return: `(xs, ys)`
         """
         box = borders.get_box()
         if box is None:
-            return (set(), set())
+            return (frozenset(), frozenset())
 
         xs: set[int] = set()
         xs.update(cls._get_potential_top_snap_points(grid=grid, borders=borders))
@@ -1457,15 +1457,15 @@ class BorderDragCache:
             )
         )
 
-        return (xs, ys)
+        return (frozenset(xs), frozenset(ys))
 
     @classmethod
     def _get_potential_top_snap_points(
         cls, *, grid: TileGrid, borders: SharedBorders
-    ) -> set[int]:
+    ) -> frozenset[int]:
         tiles = borders.left | borders.right
         if not tiles:
-            return set()
+            return frozenset()
         box = get_box(tiles)
 
         bc = box.as_4_corners()
@@ -1476,7 +1476,7 @@ class BorderDragCache:
             if intersection := detector.intersection(tile):
                 return_.add(intersection.as_corners().c0.x)
 
-        return return_
+        return frozenset(return_)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1567,8 +1567,8 @@ def get_box(tiles: Iterable[Tile]) -> Tile:
     return functools.reduce(reducer, tiles, tiles[0])
 
 
-def get_top_ys(tiles: Iterable[Tile]) -> set[int]:
-    return set(t.c0.y for t in (t.as_corners() for t in tiles))
+def get_top_ys(tiles: Iterable[Tile]) -> frozenset[int]:
+    return frozenset(t.c0.y for t in (t.as_corners() for t in tiles))
     # return set(
     #     itertools.chain(*((t.c0.y, t.c3.y) for t in (t.as_corners() for t in tiles)))
     # )
@@ -1584,7 +1584,7 @@ def clamp(num: int, min: int, max: int) -> int:
     return num
 
 
-def closest(*, to: int, out_of: Iterable[int], proximity: int) -> int | None:
+def closest(*, to: int, out_of: Iterable[int], proximity: int = 0) -> int | None:
     number, distance = min(
         ((n, abs(n - to)) for n in out_of),
         key=lambda a: a[1],
