@@ -993,6 +993,14 @@ class TileGrid:
                             // self.get_box().as_span().span.x
                         )
                     )
+                    solver.addConstraint(
+                        tile_var.span_x
+                        <= 1
+                        + (
+                            (a.as_span().span.x * x_length_new)
+                            // self.get_box().as_span().span.x
+                        )
+                    )
                     # }}}
                 case "balance":
                     # Balancing {{{
