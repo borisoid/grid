@@ -16,3 +16,10 @@ def test_2() -> None:
 
     intersection = t1.intersection(t2)
     assert intersection is None
+
+def test_3() -> None:
+    t1 = Tile.build(TileAsCorners(c0=Cell(x=0, y=0), c3=Cell(x=10, y=10)))
+    t2 = Tile.build(TileAsCorners(c0=Cell(x=-10, y=5), c3=Cell(x=-1, y=9)))
+
+    intersection = t1.intersection(t2)
+    assert intersection is None
