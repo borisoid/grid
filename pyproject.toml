@@ -12,10 +12,12 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "pygame>=2.5.2",
-    "kiwisolver>=1.4.5",
 ]
 
 [project.optional-dependencies]
+kiwisolver = [
+    "kiwisolver>=1.4.5",
+]
 dev = [
     "pytest>=8.1.1",
     "mypy>=1.8.0",
