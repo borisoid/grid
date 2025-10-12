@@ -3,7 +3,8 @@ name = "grid"
 version = "0.1.0"
 description = "Grid"
 readme = "README.md"
-license = {text = "GPL-3.0-or-later"}
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [
     {name = "borisoid", email = "boris.lazarev01@gmail.com"},
     {name = "borisoid", email = "boris.lazarev90@mail.ru"},
