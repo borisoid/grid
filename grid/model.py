@@ -10,10 +10,10 @@ import dataclasses
 import functools
 import itertools
 from collections import Counter, defaultdict
-from collections.abc import Container, Iterable
+from collections.abc import Container, Generator, Iterable
 from dataclasses import dataclass
 from enum import Enum, IntEnum, auto
-from typing import Literal, NewType, overload
+from typing import Literal, NewType, final, overload
 
 
 class GridModelException(Exception):
@@ -947,18 +947,27 @@ class TileGrid:
             groups[tile.as_corners().c3.x].append(tile.handle)
 
         x_length_old = self.get_box().as_span().span.x
-        # factor = x_length_new / x_length_old
+        # scale_factor = x_length_new / x_length_old
 
         tg = TileGrid()
 
         # Rely on the fact that `dict` items are kept in insertion order
-        for handles in groups.values():
+        for is_last, handles in mark_last(groups.values()):
             for tile in self.get_tiles_by_handles(handles):
                 tg = tg.drop_tile_in(
                     tile.scale_x(numer=x_length_new, denom=x_length_old)
                 )
 
             max_c3x = max(t.as_corners().c3.x for t in tg.get_tiles_by_handles(handles))
+
+            # Ensure the resulting size is equal to `x_length_new`.
+            # Well, only if it doesn't mean making any tile's size <= 0
+            # {{{
+            if is_last:
+                delta = x_length_new - tg.get_box().as_span().span.x
+                if delta > 0:
+                    max_c3x += delta
+            # }}}
 
             def mapper(tile: Tile) -> Tile:
                 if tile.handle not in handles:
@@ -1570,6 +1579,23 @@ class BorderDragCache:
         return frozenset(return_)
 
 
+@final
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ResizeCache:
+    original_tile_grid: TileGrid
+    tile_grid: TileGrid
+
+    @classmethod
+    def build(cls, tile_grid: TileGrid) -> "ResizeCache":
+        return ResizeCache(original_tile_grid=tile_grid, tile_grid=tile_grid)
+
+    def resize(self, *, new_boundary: Cell) -> "ResizeCache":
+        return ResizeCache(
+            original_tile_grid=self.original_tile_grid,
+            tile_grid=self.original_tile_grid.resize(new_boundary=new_boundary),
+        )
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Line:
     coordinate: int
@@ -1692,6 +1718,29 @@ def closest(*, to: int, out_of: Iterable[int], proximity: int = 0) -> int | None
     )
 
     return None if distance > proximity else number
+
+
+type bool_is_last = bool
+
+
+def mark_last[T](iterable: Iterable[T]) -> Generator[tuple[bool_is_last, T]]:
+    iterator = iter(iterable)
+
+    try:
+        item = next(iterator)
+    except StopIteration:
+        return
+
+    while True:
+        try:
+            item_next = next(iterator)
+        except StopIteration:
+            yield True, item
+            return
+
+        yield False, item
+
+        item = item_next
 
 
 def get_grid_section(*, cell: Cell, origin_tile: Tile) -> GridSection:

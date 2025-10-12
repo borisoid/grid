@@ -1,7 +1,7 @@
 import itertools
 import sys
 from enum import Enum
-from typing import Generator
+from typing import Final, Generator
 
 import pygame as pg
 
@@ -11,6 +11,7 @@ from .model import (
     CardinalDirection,
     Cell,
     IntHandle,
+    ResizeCache,
     SharedBorders,
     Tile,
     TileAsCorners,
@@ -362,7 +363,7 @@ def main_loop() -> None:
     pg.font.init()
     font = pg.font.SysFont("Hack", 25)
 
-    # ORIGINAL_TILE_GRID = tile_grid = TileGrid(
+    # tile_grid: TileGrid = TileGrid(
     #     (
     #         Tile.build(
     #             TileAsCorners(
@@ -373,7 +374,7 @@ def main_loop() -> None:
     #         ),
     #     )
     # ).centralize_origin()
-    ORIGINAL_TILE_GRID = tile_grid = (
+    tile_grid: TileGrid = (
         TileGrid(
             (
                 Tile.build(
@@ -402,10 +403,13 @@ def main_loop() -> None:
         )
     ).centralize_origin()
 
+    ORIGINAL_TILE_GRID: Final[TileGrid] = tile_grid
+
     border_mode = BorderMode.SHORTEST
     mode: Mode = Mode.NORMAL
 
     border_drag_cache: BorderDragCache | None = None
+    resize_cache: ResizeCache | None = None
 
     while True:
         events = tuple(pg.event.get())
@@ -450,18 +454,21 @@ def main_loop() -> None:
                         # tile_grid = tile_grid.resize_along_x(x_length_new=30)
                         mode = Mode.SCALE
                         print(f"Mode: {mode.value}")
+                        resize_cache = ResizeCache.build(tile_grid)
 
-                    case pg.K_PLUS:
-                        if mode == Mode.SCALE:
-                            tile_grid = tile_grid.resize_along_x(
-                                x_length_new=tile_grid.get_box().as_span().span.x + 1
-                            )
+                    case pg.K_KP_PLUS if mode == Mode.SCALE:
+                        assert resize_cache is not None
+                        resize_cache = resize_cache.resize(
+                            new_boundary=tile_grid.get_box().as_span().span + Cell(1, 0)
+                        )
+                        tile_grid = resize_cache.tile_grid
 
-                    case pg.K_MINUS:
-                        if mode == Mode.SCALE:
-                            tile_grid = tile_grid.resize_along_x(
-                                x_length_new=tile_grid.get_box().as_span().span.x - 1
-                            )
+                    case pg.K_MINUS if mode == Mode.SCALE:
+                        assert resize_cache is not None
+                        resize_cache = resize_cache.resize(
+                            new_boundary=tile_grid.get_box().as_span().span - Cell(1, 0)
+                        )
+                        tile_grid = resize_cache.tile_grid
 
                     case pg.K_e:
                         print(tile_grid.get_invariant_errors())
