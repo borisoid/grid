@@ -10,12 +10,10 @@ import dataclasses
 import functools
 import itertools
 from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections.abc import Container, Iterable
 from dataclasses import dataclass
 from enum import Enum, IntEnum, auto
 from typing import Literal, NewType, overload
-
-from kiwisolver import Expression, Solver, Variable
 
 
 class GridModelException(Exception):
@@ -261,14 +259,21 @@ class Tile:
             self_s.cell + self_s.step,
         )
 
-    def replace_tile(self, arg: TileAsCorners | TileAsStep) -> "Tile":
+    def replace_tile(self, arg: TileAsCorners | TileAsStep | TileAsSpan) -> "Tile":
         return Tile.build(arg, handle=self.handle)
 
-    def corners_c0_add(self, cell: Cell) -> "Tile":
+    def replace_span(self, span: Cell) -> "Tile":
+        return self.replace_tile(TileAsSpan(self.as_span().cell, span))
+
+    def replace_c3x(self, c3x: int) -> "Tile":
+        tc = self.as_corners()
+        return self.replace_tile(TileAsCorners(tc.c0, Cell(c3x, tc.c3.y)))
+
+    def c0_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
         return self.replace_tile(TileAsCorners(c0=tc.c0 + cell, c3=tc.c3))
 
-    def corners_c3_add(self, cell: Cell) -> "Tile":
+    def c3_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
         return self.replace_tile(TileAsCorners(c0=tc.c0, c3=tc.c3 + cell))
 
@@ -324,6 +329,15 @@ class Tile:
             TileAsCorners(
                 c0=self.as_corners().c0.rotate(side, to=to),
                 c3=self.as_corners().c3.rotate(side, to=to),
+            )
+        )
+
+    def scale_x(self, *, numer: int, denom: int = 1) -> "Tile":
+        s = self.as_span()
+        return self.replace_span(
+            Cell(
+                scale(s.span.x, numer=numer, denom=denom, allow_0=False),
+                s.span.y,
             )
         )
 
@@ -616,8 +630,8 @@ class SharedBorders:
             return vertical.as_corners().c0
 
         if (vertical is not None) and (horizontal is not None):
-            vertical = vertical.corners_c3_add(Cell(0, 1))
-            horizontal = horizontal.corners_c3_add(Cell(1, 0))
+            vertical = vertical.c3_add(Cell(0, 1))
+            horizontal = horizontal.c3_add(Cell(1, 0))
 
             intersection = vertical.intersection(horizontal)
             assert intersection is not None
@@ -657,6 +671,9 @@ class TileGrid:
         if return_ is None:
             raise ValueError
         return return_
+
+    def get_tiles_by_handles(self, handles: Container[IntHandle]) -> tuple[Tile, ...]:
+        return tuple(tile for tile in self.tiles if tile.handle in handles)
 
     def try_get_tile_by_cell(self, cell: Cell) -> Tile | None:
         for tile in self.tiles:
@@ -768,14 +785,8 @@ class TileGrid:
             return (
                 grid.replace_tiles(
                     itertools.chain(
-                        (
-                            t.corners_c3_add(Cell(as_span.span.x, 0))
-                            for t in border.left
-                        ),
-                        (
-                            t.corners_c0_add(Cell(as_span.span.x, 0))
-                            for t in border.right
-                        ),
+                        (t.c3_add(Cell(as_span.span.x, 0)) for t in border.left),
+                        (t.c0_add(Cell(as_span.span.x, 0)) for t in border.right),
                     )
                 )
                 .delete_by_handle(handle)
@@ -926,6 +937,10 @@ class TileGrid:
     def resize_along_x(
         self, *, x_length_new: int, mode: Literal["balance", "scale"] = "scale"
     ) -> "TileGrid":
+        # return self.resize_along_x__experimental(x_length_new=x_length_new)
+
+        from kiwisolver import Expression, Solver, Variable
+
         self.assert_invariants()
 
         @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1049,6 +1064,76 @@ class TileGrid:
             for tile_var in (tile_vars[tile.handle] for tile in self.tiles)
         )
 
+    def resize_along_x__experimental(
+        self, *, x_length_new: int, **kwargs: object
+    ) -> "TileGrid":
+        # Group tiles by `c3.x`,
+        # ASC-sort the groups by `c3.x`,
+        # Scale tiles.
+        # for group in groups:
+        #     move each tile as far left as it can go,
+        #     expand each tile to right so that it's `c3.x` is equal to largest `c3.x` in the `group`
+
+        groups: defaultdict[int, list[IntHandle]] = defaultdict(list)
+        for tile in sorted(self.tiles, key=lambda tile: tile.as_corners().c3.x):
+            groups[tile.as_corners().c3.x].append(tile.handle)
+
+        x_length_old = self.get_box().as_span().span.x
+        # factor = x_length_new / x_length_old
+
+        tg = self
+
+        # Rely on the fact that `dict` items are kept in insertion order
+        for handles in groups.values():
+            for tile in self.get_tiles_by_handles(handles):
+                tg = tg.drop_tile_in(
+                    tile.scale_x(numer=x_length_new, denom=x_length_old)
+                )
+
+            max_c3x = max(t.as_corners().c3.x for t in tg.get_tiles_by_handles(handles))
+
+            def mapper(tile: Tile) -> Tile:
+                if tile.handle not in handles:
+                    return tile
+
+                return tile.replace_c3x(max_c3x)
+
+            tg = TileGrid.from_(mapper(t) for t in tg.tiles)
+
+        return tg
+
+    def drop_tile_in(
+        self, tile: Tile, *, direction: Literal["rtl"] = "rtl"
+    ) -> "TileGrid":
+        if len(self.tiles) == 0:
+            return TileGrid.from_(tile)
+
+        box = self.get_box()
+        box_c = box.as_corners()
+        tile_c = tile.as_corners()
+        detector = Tile.build(
+            TileAsCorners(
+                Cell(box_c.c0.x, tile_c.c0.y),
+                Cell(box_c.c3.x, tile_c.c3.y),
+            )
+        )
+
+        desired_c0x = max(
+            (t.as_corners().c3.x for t in self.tiles if t.intersects_with(detector)),
+            default=None,
+        )
+        if desired_c0x is not None:
+            desired_c0x += 1
+        else:
+            desired_c0x = min(t.as_corners().c0.x for t in self.tiles)
+
+        x_translation = desired_c0x - tile_c.c0.x
+        tile = tile.translate(
+            delta=Cell(x_translation, 0),
+        )
+
+        return TileGrid.from_(self.tiles, tile)
+
     def get_top_ys(self) -> frozenset[int]:
         return get_top_ys(self.tiles)
 
@@ -1126,8 +1211,8 @@ class TileGrid:
         shared_borders = self.get_longest_left_border(tile_2.handle)
         return self.replace_tiles(
             itertools.chain(
-                (t.corners_c3_add(Cell(delta_x, 0)) for t in shared_borders.left),
-                (t.corners_c0_add(Cell(delta_x, 0)) for t in shared_borders.right),
+                (t.c3_add(Cell(delta_x, 0)) for t in shared_borders.left),
+                (t.c0_add(Cell(delta_x, 0)) for t in shared_borders.right),
             )
         )
 
@@ -1261,8 +1346,8 @@ class TileGrid:
         if (vertical is None) or (horizontal is None):
             return shared_borders
 
-        vertical = vertical.corners_c3_add(Cell(0, 1))
-        horizontal = horizontal.corners_c3_add(Cell(1, 0))
+        vertical = vertical.c3_add(Cell(0, 1))
+        horizontal = horizontal.c3_add(Cell(1, 0))
 
         v1, v2 = vertical.as_4_corners()[0:3:2]
         h1, h2 = horizontal.as_4_corners()[0:2]
@@ -1422,16 +1507,16 @@ class BorderDragCache:
         borders = borders.pull_coords(grid)
         grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c3_add(Cell(current_delta.x, 0)) for t in borders.left),
-                (t.corners_c0_add(Cell(current_delta.x, 0)) for t in borders.right),
+                (t.c3_add(Cell(current_delta.x, 0)) for t in borders.left),
+                (t.c0_add(Cell(current_delta.x, 0)) for t in borders.right),
             )
         )
 
         borders = borders.pull_coords(grid)
         grid = grid.replace_tiles(
             itertools.chain(
-                (t.corners_c3_add(Cell(0, current_delta.y)) for t in borders.top),
-                (t.corners_c0_add(Cell(0, current_delta.y)) for t in borders.bottom),
+                (t.c3_add(Cell(0, current_delta.y)) for t in borders.top),
+                (t.c0_add(Cell(0, current_delta.y)) for t in borders.bottom),
             )
         )
 
@@ -1579,9 +1664,6 @@ def get_box(tiles: Iterable[Tile]) -> Tile:
 
 def get_top_ys(tiles: Iterable[Tile]) -> frozenset[int]:
     return frozenset(t.c0.y for t in (t.as_corners() for t in tiles))
-    # return set(
-    #     itertools.chain(*((t.c0.y, t.c3.y) for t in (t.as_corners() for t in tiles)))
-    # )
 
 
 def clamp(num: int, min: int, max: int) -> int:
@@ -1592,6 +1674,19 @@ def clamp(num: int, min: int, max: int) -> int:
         return min
 
     return num
+
+
+def scale(n: int, *, numer: int, denom: int = 1, allow_0: bool) -> int:
+    return_ = (n * numer) // denom
+    if allow_0 or (return_ != 0):
+        return return_
+
+    if n > 0:
+        return 1
+    if n < 0:
+        return 1
+
+    raise ValueError(f"{n=} and {allow_0=}")
 
 
 def closest(*, to: int, out_of: Iterable[int], proximity: int = 0) -> int | None:

@@ -12,6 +12,7 @@
         "kiwisolver",
         "MOUSEBUTTONDOWN",
         "MOUSEBUTTONUP",
+        "numer",
         "pygame"
     ],
 }
