@@ -355,6 +355,8 @@ class Mode(Enum):
     SPLIT_LEFT = "SPLIT_LEFT"
     SPLIT_RIGHT = "SPLIT_RIGHT"
 
+    SCALE = "SCALE"
+
 
 def main_loop() -> None:
     pg.font.init()
@@ -444,8 +446,22 @@ def main_loop() -> None:
                         # tile_grid = tile_grid.snap_2_edges(handle=0, proximity=3)
 
                     case pg.K_s:
-                        # tile_grid = tile_grid.resize(new_boundary=Cell(x=10, y=10))
-                        tile_grid = tile_grid.resize_along_x(x_length_new=10)
+                        # # tile_grid = tile_grid.resize(new_boundary=Cell(x=10, y=10))
+                        # tile_grid = tile_grid.resize_along_x(x_length_new=30)
+                        mode = Mode.SCALE
+                        print(f"Mode: {mode.value}")
+
+                    case pg.K_PLUS:
+                        if mode == Mode.SCALE:
+                            tile_grid = tile_grid.resize_along_x(
+                                x_length_new=tile_grid.get_box().as_span().span.x + 1
+                            )
+
+                    case pg.K_MINUS:
+                        if mode == Mode.SCALE:
+                            tile_grid = tile_grid.resize_along_x(
+                                x_length_new=tile_grid.get_box().as_span().span.x - 1
+                            )
 
                     case pg.K_e:
                         print(tile_grid.get_invariant_errors())
@@ -496,7 +512,7 @@ def main_loop() -> None:
 
                 if selected_tile is not None:
                     match mode:
-                        case Mode.NORMAL:
+                        case Mode.NORMAL | Mode.SCALE:
                             pass
 
                         case Mode.DELETE:

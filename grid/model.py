@@ -642,7 +642,7 @@ class SharedBorders:
 
 @dataclass(frozen=True, slots=True)
 class TileGrid:
-    tiles: tuple[Tile, ...]
+    tiles: tuple[Tile, ...] = ()
 
     @staticmethod
     def from_(tiles: Iterable[Tile] | Tile, *tiles_: Tile) -> "TileGrid":
@@ -934,11 +934,45 @@ class TileGrid:
             .rotate_counterclockwise()
         )
 
-    def resize_along_x(
-        self, *, x_length_new: int, mode: Literal["balance", "scale"] = "scale"
-    ) -> "TileGrid":
-        # return self.resize_along_x__experimental(x_length_new=x_length_new)
+    def resize_along_x(self, *, x_length_new: int) -> "TileGrid":
+        # Group tiles by `c3.x`,
+        # ASC-sort the groups by `c3.x`,
+        # Scale tiles.
+        # for group in groups:
+        #     move each tile as far left as it can go,
+        #     expand each tile to right so that it's `c3.x` is equal to largest `c3.x` in the `group`
 
+        groups: defaultdict[int, list[IntHandle]] = defaultdict(list)
+        for tile in sorted(self.tiles, key=lambda tile: tile.as_corners().c3.x):
+            groups[tile.as_corners().c3.x].append(tile.handle)
+
+        x_length_old = self.get_box().as_span().span.x
+        # factor = x_length_new / x_length_old
+
+        tg = TileGrid()
+
+        # Rely on the fact that `dict` items are kept in insertion order
+        for handles in groups.values():
+            for tile in self.get_tiles_by_handles(handles):
+                tg = tg.drop_tile_in(
+                    tile.scale_x(numer=x_length_new, denom=x_length_old)
+                )
+
+            max_c3x = max(t.as_corners().c3.x for t in tg.get_tiles_by_handles(handles))
+
+            def mapper(tile: Tile) -> Tile:
+                if tile.handle not in handles:
+                    return tile
+
+                return tile.replace_c3x(max_c3x)
+
+            tg = TileGrid.from_(mapper(t) for t in tg.tiles)
+
+        return tg
+
+    def resize_along_x_using_solver(
+        self, *, x_length_new: int, mode: Literal["scale", "balance"] = "scale"
+    ) -> "TileGrid":
         from kiwisolver import Expression, Solver, Variable
 
         self.assert_invariants()
@@ -1063,44 +1097,6 @@ class TileGrid:
             )
             for tile_var in (tile_vars[tile.handle] for tile in self.tiles)
         )
-
-    def resize_along_x__experimental(
-        self, *, x_length_new: int, **kwargs: object
-    ) -> "TileGrid":
-        # Group tiles by `c3.x`,
-        # ASC-sort the groups by `c3.x`,
-        # Scale tiles.
-        # for group in groups:
-        #     move each tile as far left as it can go,
-        #     expand each tile to right so that it's `c3.x` is equal to largest `c3.x` in the `group`
-
-        groups: defaultdict[int, list[IntHandle]] = defaultdict(list)
-        for tile in sorted(self.tiles, key=lambda tile: tile.as_corners().c3.x):
-            groups[tile.as_corners().c3.x].append(tile.handle)
-
-        x_length_old = self.get_box().as_span().span.x
-        # factor = x_length_new / x_length_old
-
-        tg = self
-
-        # Rely on the fact that `dict` items are kept in insertion order
-        for handles in groups.values():
-            for tile in self.get_tiles_by_handles(handles):
-                tg = tg.drop_tile_in(
-                    tile.scale_x(numer=x_length_new, denom=x_length_old)
-                )
-
-            max_c3x = max(t.as_corners().c3.x for t in tg.get_tiles_by_handles(handles))
-
-            def mapper(tile: Tile) -> Tile:
-                if tile.handle not in handles:
-                    return tile
-
-                return tile.replace_c3x(max_c3x)
-
-            tg = TileGrid.from_(mapper(t) for t in tg.tiles)
-
-        return tg
 
     def drop_tile_in(
         self, tile: Tile, *, direction: Literal["rtl"] = "rtl"
