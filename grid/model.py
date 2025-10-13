@@ -392,7 +392,11 @@ class Tile:
         return self.intersection(other) is not None
 
     def contains_tile(self, other: "Tile") -> bool:
-        return self.intersection(other) == other
+        intersection = self.intersection(other)
+        if intersection is None:
+            return False
+
+        return intersection.tile == other.tile
 
     def min_max(self: "Tile", other: "Tile", /) -> "Tile":
         tile_1 = self.as_corners()
