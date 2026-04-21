@@ -16,6 +16,7 @@ from collections.abc import Container, Generator, Iterable
 from dataclasses import dataclass
 from enum import Enum, IntEnum, auto
 from typing import Literal, NewType, final, overload
+from warnings import deprecated
 
 
 class GridModelException(Exception):
@@ -419,6 +420,7 @@ class Tile:
         s = self.as_span()
         return s.span.x * s.span.y
 
+    @deprecated("")
     def un_occupy(self, area: "Tile", /, *, prefer: Orientation) -> "Tile | None":
         curr: "Tile | None" = self
         assert curr is not None
@@ -438,6 +440,7 @@ class Tile:
 
         return curr
 
+    @deprecated("")
     def un_occupy_horizontal(self, area: "Tile", /) -> "Tile | None":
         curr = self
 
