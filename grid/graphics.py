@@ -485,7 +485,6 @@ def main_loop() -> None:
 
                     case pg.K_z:
                         tile_grid = tile_grid.rotate_counterclockwise()
-
                     case pg.K_x:
                         tile_grid = tile_grid.rotate_clockwise()
 

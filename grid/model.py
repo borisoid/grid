@@ -914,7 +914,7 @@ class TileGrid:
             corners = tile.as_corners()
             width = corners.c3.x - corners.c0.x
 
-            if (tile.handle != tile_handle) or (width < 2):
+            if (tile.handle != tile_handle) or (width < 1):
                 new_tiles.append(tile)
                 continue
 
@@ -947,9 +947,9 @@ class TileGrid:
         # Group tiles by `c3.x`,
         # ASC-sort the groups by `c3.x`,
         # Scale tiles.
-        # for group in groups:
-        #     move each tile as far left as it can go,
-        #     expand each tile to right so that it's `c3.x` is equal to largest `c3.x` in the `group`
+        # for `group` in groups:
+        #     move each tile in `group` as far left as it can go,
+        #     stretch each tile to right so that it's `c3.x` is equal to largest `c3.x` in the `group`
 
         groups: defaultdict[int, list[IntHandle]] = defaultdict(list)
         for tile in sorted(self.tiles, key=lambda tile: tile.as_corners().c3.x):
