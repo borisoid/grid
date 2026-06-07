@@ -1,9 +1,9 @@
-from grid.model import Cell, TileAsCorners, TileAsStep
+from grid.model import Cell, TileCoordsAsCorners, TileCoordsAsStep
 
 
 def test_1() -> None:
     # Setup {{{
-    tile_as_step = TileAsStep(
+    tile_as_step = TileCoordsAsStep(
         cell=Cell(0, 0),
         step=Cell(2, 3),
     )
@@ -14,7 +14,7 @@ def test_1() -> None:
     # }}} Act
 
     # Assert {{{
-    assert tile_as_corners == TileAsCorners(
+    assert tile_as_corners == TileCoordsAsCorners(
         c0=Cell(0, 0),
         c3=Cell(2, 3),
     )

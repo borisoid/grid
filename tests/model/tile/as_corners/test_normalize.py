@@ -1,9 +1,9 @@
-from grid.model import Cell, TileAsCorners
+from grid.model import Cell, TileCoordsAsCorners
 
 
 def test_1() -> None:
     # Setup {{{
-    tile_as_corners = TileAsCorners(
+    tile_as_corners = TileCoordsAsCorners(
         c0=Cell(5, 1),
         c3=Cell(1, 5),
     )
@@ -14,7 +14,7 @@ def test_1() -> None:
     # }}} Act
 
     # Assert {{{
-    assert tile_as_corners_normalized == TileAsCorners(
+    assert tile_as_corners_normalized == TileCoordsAsCorners(
         c0=Cell(1, 1),
         c3=Cell(5, 5),
     )

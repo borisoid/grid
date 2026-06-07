@@ -3,7 +3,8 @@
 import itertools
 import sys
 from enum import Enum
-from typing import Final, Generator
+from typing import Final
+from collections.abc import Generator
 
 import pygame as pg
 
@@ -16,7 +17,7 @@ from .model import (
     ResizeCache,
     SharedBorders,
     Tile,
-    TileAsCorners,
+    TileCoordsAsCorners,
     TileGrid,
     get_box,
 )
@@ -337,7 +338,7 @@ def tile_to_screen_space(tile: Tile) -> Tile:
 
     delta = Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
     return tile.replace_tile(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=corners.c0 + delta,
             c3=corners.c3 + delta,
         )
@@ -380,7 +381,7 @@ def main_loop() -> None:
         TileGrid(
             (
                 Tile.build(
-                    TileAsCorners(
+                    TileCoordsAsCorners(
                         c0=Cell(x=0, y=0),
                         c3=Cell(x=20, y=20),
                     ),

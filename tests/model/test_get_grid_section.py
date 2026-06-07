@@ -1,11 +1,11 @@
-from grid.model import Cell, GridSection, Tile, TileAsCorners, get_grid_section
+from grid.model import Cell, GridSection, Tile, TileCoordsAsCorners, get_grid_section
 
 
 def test_get_grid_section__when_origin() -> None:
     # Setup {{{
     cell = Cell(x=0, y=0)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -25,7 +25,7 @@ def test_get_grid_section__when_top() -> None:
     # Setup {{{
     cell = Cell(x=0, y=-1)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -45,7 +45,7 @@ def test_get_grid_section__when_bottom() -> None:
     # Setup {{{
     cell = Cell(x=0, y=6)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -65,7 +65,7 @@ def test_get_grid_section__when_left() -> None:
     # Setup {{{
     cell = Cell(x=-1, y=0)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -85,7 +85,7 @@ def test_get_grid_section__when_right() -> None:
     # Setup {{{
     cell = Cell(x=6, y=0)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -105,7 +105,7 @@ def test_get_grid_section__when_top_left() -> None:
     # Setup {{{
     cell = Cell(x=-1, y=-1)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -125,7 +125,7 @@ def test_get_grid_section__when_top_right() -> None:
     # Setup {{{
     cell = Cell(x=6, y=-1)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -145,7 +145,7 @@ def test_get_grid_section__when_bottom_left() -> None:
     # Setup {{{
     cell = Cell(x=-1, y=6)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
@@ -165,7 +165,7 @@ def test_get_grid_section__when_bottom_right() -> None:
     # Setup {{{
     cell = Cell(x=6, y=6)
     origin_tile = Tile.build(
-        TileAsCorners(
+        TileCoordsAsCorners(
             c0=Cell(x=0, y=0),
             c3=Cell(x=5, y=5),
         )
