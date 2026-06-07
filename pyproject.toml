@@ -34,7 +34,8 @@ testpaths = [
 [tool.pyright]
 pythonVersion = "3.13"
 pythonPlatform = "Linux"
-strict = ["*"]
+typeCheckingMode = "strict"
+reportDeprecated = "warning"
 reportWildcardImportFromLibrary = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
 # reportShadowedImports = "error"
