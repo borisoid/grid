@@ -183,7 +183,9 @@ assert cell.step.y >= 0
 ```
 """
 
-TileCoordsAsCornersNormalized = NewType("TileCoordsAsCornersNormalized", TileCoordsAsCorners)
+TileCoordsAsCornersNormalized = NewType(
+    "TileCoordsAsCornersNormalized", TileCoordsAsCorners
+)
 """
 `c0` is the top left corner - `c0.x` and `c0.y` are low.
 
@@ -219,6 +221,12 @@ class Tile:
             return Tile(coords=arg.as_corners(), handle=handle)
 
         return Tile(coords=arg.normalize(), handle=handle)
+
+    @staticmethod
+    def from_cells(cells: Iterable[Cell]) -> "Tile":
+        return get_box(
+            Tile.build(TileCoordsAsCorners(c0=cell, c3=cell)) for cell in cells
+        )
 
     def as_corners(self) -> TileCoordsAsCornersNormalized:
         return self.coords
@@ -262,26 +270,28 @@ class Tile:
             self_s.cell + self_s.step,
         )
 
-    def replace_tile(self, arg: TileCoordsAsCorners | TileCoordsAsStep | TileCoordsAsSpan) -> "Tile":
+    def replace_coords(
+        self, arg: TileCoordsAsCorners | TileCoordsAsStep | TileCoordsAsSpan
+    ) -> "Tile":
         return Tile.build(arg, handle=self.handle)
 
     def replace_span(self, span: Cell) -> "Tile":
-        return self.replace_tile(TileCoordsAsSpan(self.as_span().cell, span))
+        return self.replace_coords(TileCoordsAsSpan(self.as_span().cell, span))
 
     def replace_c3x(self, c3x: int) -> "Tile":
         tc = self.as_corners()
-        return self.replace_tile(TileCoordsAsCorners(tc.c0, Cell(c3x, tc.c3.y)))
+        return self.replace_coords(TileCoordsAsCorners(tc.c0, Cell(c3x, tc.c3.y)))
 
     def c0_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
-        return self.replace_tile(TileCoordsAsCorners(c0=tc.c0 + cell, c3=tc.c3))
+        return self.replace_coords(TileCoordsAsCorners(c0=tc.c0 + cell, c3=tc.c3))
 
     def c3_add(self, cell: Cell) -> "Tile":
         tc = self.as_corners()
-        return self.replace_tile(TileCoordsAsCorners(c0=tc.c0, c3=tc.c3 + cell))
+        return self.replace_coords(TileCoordsAsCorners(c0=tc.c0, c3=tc.c3 + cell))
 
     def translate(self, *, delta: Cell) -> "Tile":
-        return self.replace_tile(
+        return self.replace_coords(
             TileCoordsAsCorners(
                 c0=self.as_corners().c0 + delta,
                 c3=self.as_corners().c3 + delta,
@@ -289,7 +299,7 @@ class Tile:
         )
 
     def mirror_horizontally(self) -> "Tile":
-        return self.replace_tile(
+        return self.replace_coords(
             TileCoordsAsCorners(
                 c0=self.as_corners().c0.mirror_horizontally(),
                 c3=self.as_corners().c3.mirror_horizontally(),
@@ -297,7 +307,7 @@ class Tile:
         )
 
     def mirror_vertically(self) -> "Tile":
-        return self.replace_tile(
+        return self.replace_coords(
             TileCoordsAsCorners(
                 c0=self.as_corners().c0.mirror_vertically(),
                 c3=self.as_corners().c3.mirror_vertically(),
@@ -312,7 +322,7 @@ class Tile:
                 return self.mirror_vertically()
 
     def rotate_clockwise(self) -> "Tile":
-        return self.replace_tile(
+        return self.replace_coords(
             TileCoordsAsCorners(
                 c0=self.as_corners().c0.rotate_clockwise(),
                 c3=self.as_corners().c3.rotate_clockwise(),
@@ -320,7 +330,7 @@ class Tile:
         )
 
     def rotate_counterclockwise(self) -> "Tile":
-        return self.replace_tile(
+        return self.replace_coords(
             TileCoordsAsCorners(
                 c0=self.as_corners().c0.rotate_counterclockwise(),
                 c3=self.as_corners().c3.rotate_counterclockwise(),
@@ -328,7 +338,7 @@ class Tile:
         )
 
     def rotate(self, side: CardinalDirection, /, *, to: CardinalDirection) -> "Tile":
-        return self.replace_tile(
+        return self.replace_coords(
             TileCoordsAsCorners(
                 c0=self.as_corners().c0.rotate(side, to=to),
                 c3=self.as_corners().c3.rotate(side, to=to),
@@ -343,10 +353,6 @@ class Tile:
                 s.span.y,
             )
         )
-
-    @staticmethod
-    def from_cells(cells: Iterable[Cell]) -> "Tile":
-        return get_box(Tile.build(TileCoordsAsCorners(c0=cell, c3=cell)) for cell in cells)
 
     def contains_cell(self, cell: Cell) -> bool:
         c = self.as_corners()
@@ -474,7 +480,7 @@ class Tile:
             area_to_free = area_to_free.mirror_vertically()
 
         # Cut bottom part
-        curr = curr.replace_tile(
+        curr = curr.replace_coords(
             TileCoordsAsCorners(
                 c0=curr.as_corners().c0,
                 c3=area_to_free.as_4_corners()[1] - Cell(0, 1),
@@ -488,7 +494,7 @@ class Tile:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class TileGridInvariantErrorContainer:
+class TileGridInvariantErrors:
     handles: dict[IntHandle, int]
     overlapping_tiles: tuple[tuple[Tile, Tile], ...]
     area_mismatch: int
@@ -579,21 +585,6 @@ class SharedBorders:
             bottom=self.bottom.union(other.bottom),
         )
 
-    def rotate(
-        self, side: CardinalDirection, /, *, to: CardinalDirection
-    ) -> "SharedBorders":
-        match (to - side) % 4:
-            case 0:
-                return self
-            case 1:
-                return self.rotate_clockwise()
-            case 2:
-                return self.rotate_clockwise().rotate_clockwise()
-            case 3:
-                return self.rotate_counterclockwise()
-            case _:
-                raise Unreachable
-
     def rotate_clockwise(self) -> "SharedBorders":
         return SharedBorders(
             left=frozenset(tile.rotate_clockwise() for tile in self.bottom),
@@ -609,6 +600,21 @@ class SharedBorders:
             top=frozenset(tile.rotate_counterclockwise() for tile in self.right),
             bottom=frozenset(tile.rotate_counterclockwise() for tile in self.left),
         )
+
+    def rotate(
+        self, side: CardinalDirection, /, *, to: CardinalDirection
+    ) -> "SharedBorders":
+        match (to - side) % 4:
+            case 0:
+                return self
+            case 1:
+                return self.rotate_clockwise()
+            case 2:
+                return self.rotate_clockwise().rotate_clockwise()
+            case 3:
+                return self.rotate_counterclockwise()
+            case _:
+                raise Unreachable
 
     def mirror_horizontally(self) -> "SharedBorders":
         return SharedBorders(
@@ -669,6 +675,9 @@ class TileGrid:
     def centralize_origin(self) -> "TileGrid":
         return self.translate(delta=Cell(x=0, y=0) - self.tiles[0].as_corners().c0)
 
+    def centralize_c0(self) -> "TileGrid":
+        return self.translate(delta=Cell(x=0, y=0) - self.get_box().as_corners().c0)
+
     def try_get_tile_by_handle(self, handle: IntHandle) -> Tile | None:
         for tile in self.tiles:
             if tile.handle == handle:
@@ -722,8 +731,8 @@ class TileGrid:
 
         return box_area - tiles_area
 
-    def get_invariant_errors(self) -> TileGridInvariantErrorContainer:
-        return TileGridInvariantErrorContainer(
+    def get_invariant_errors(self) -> TileGridInvariantErrors:
+        return TileGridInvariantErrors(
             handles=self.get_handle_errors(),
             overlapping_tiles=self.get_overlapping_tile_pairs(),
             area_mismatch=self.get_area_mismatch(),
@@ -804,6 +813,9 @@ class TileGrid:
 
         return self
 
+    def unsafe_push(self, tile: Tile) -> "TileGrid":
+        return TileGrid.from_(itertools.chain(self.tiles, (tile,)))
+
     def insert(
         self,
         *,
@@ -847,7 +859,7 @@ class TileGrid:
                 new_tiles.append(tile)
             elif line.intersects_tile(tile):
                 new_tiles.append(
-                    tile.replace_tile(
+                    tile.replace_coords(
                         TileCoordsAsCorners(
                             c0=tile.as_corners().c0,
                             c3=tile.as_corners().c3 + Cell(x=1, y=0),
@@ -858,7 +870,7 @@ class TileGrid:
                 tile
             ):
                 new_tiles.append(
-                    tile.replace_tile(
+                    tile.replace_coords(
                         TileCoordsAsCorners(
                             c0=tile.as_corners().c0 + Cell(x=1, y=0),
                             c3=tile.as_corners().c3 + Cell(x=1, y=0),
@@ -923,7 +935,7 @@ class TileGrid:
 
             new_tiles.extend(
                 (
-                    tile.replace_tile(
+                    tile.replace_coords(
                         TileCoordsAsCorners(c0=corners.c0, c3=c3),
                     ),
                     Tile.build(
@@ -1387,7 +1399,7 @@ class TileGrid:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class BorderDragCache:
+class BorderDragCx:
     cursor: Cell
     borders: SharedBorders
     grid: TileGrid
@@ -1403,7 +1415,7 @@ class BorderDragCache:
     @classmethod
     def build(
         cls, *, borders: SharedBorders, grid: TileGrid, cursor: Cell
-    ) -> "BorderDragCache":
+    ) -> "BorderDragCx":
         min1 = functools.partial(min, default=1)
         min_span_left = min1(tile.as_span().span.x for tile in borders.left)
         min_span_right = min1(tile.as_span().span.x for tile in borders.right)
@@ -1444,7 +1456,7 @@ class BorderDragCache:
             )
         # }}} Snap Points
 
-        return BorderDragCache(
+        return BorderDragCx(
             cursor=cursor,
             borders=borders,
             grid=grid,
@@ -1578,7 +1590,9 @@ class BorderDragCache:
         box = get_box(tiles)
 
         bc = box.as_4_corners()
-        detector = Tile.build(TileCoordsAsCorners(bc[0] + Cell(0, -1), bc[1] + Cell(0, -1)))
+        detector = Tile.build(
+            TileCoordsAsCorners(bc[0] + Cell(0, -1), bc[1] + Cell(0, -1))
+        )
 
         return_: set[int] = set()
         for tile in grid.tiles:
@@ -1590,16 +1604,16 @@ class BorderDragCache:
 
 @final
 @dataclass(frozen=True, slots=True, kw_only=True)
-class ResizeCache:
+class ResizeCx:
     original_tile_grid: TileGrid
     tile_grid: TileGrid
 
     @classmethod
-    def build(cls, tile_grid: TileGrid) -> "ResizeCache":
-        return ResizeCache(original_tile_grid=tile_grid, tile_grid=tile_grid)
+    def build(cls, tile_grid: TileGrid) -> "ResizeCx":
+        return ResizeCx(original_tile_grid=tile_grid, tile_grid=tile_grid)
 
-    def resize(self, *, new_boundary: Cell) -> "ResizeCache":
-        return ResizeCache(
+    def resize(self, *, new_boundary: Cell) -> "ResizeCx":
+        return ResizeCx(
             original_tile_grid=self.original_tile_grid,
             tile_grid=self.original_tile_grid.resize(new_boundary=new_boundary),
         )

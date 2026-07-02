@@ -9,12 +9,12 @@ from collections.abc import Generator
 import pygame as pg
 
 from .model import (
-    BorderDragCache,
+    BorderDragCx,
     BorderMode,
     CardinalDirection,
     Cell,
     IntHandle,
-    ResizeCache,
+    ResizeCx,
     SharedBorders,
     Tile,
     TileCoordsAsCorners,
@@ -337,7 +337,7 @@ def tile_to_screen_space(tile: Tile) -> Tile:
     corners = tile.as_corners()
 
     delta = Cell(x=CELLS_X // 2, y=CELLS_Y // 2)
-    return tile.replace_tile(
+    return tile.replace_coords(
         TileCoordsAsCorners(
             c0=corners.c0 + delta,
             c3=corners.c3 + delta,
@@ -411,8 +411,8 @@ def main_loop() -> None:
     border_mode = BorderMode.SHORTEST
     mode: Mode = Mode.NORMAL
 
-    border_drag_cache: BorderDragCache | None = None
-    resize_cache: ResizeCache | None = None
+    border_drag_cx: BorderDragCx | None = None
+    resize_cx: ResizeCx | None = None
 
     while True:
         events = tuple(pg.event.get())
@@ -457,21 +457,21 @@ def main_loop() -> None:
                         # tile_grid = tile_grid.resize_along_x(x_length_new=30)
                         mode = Mode.SCALE
                         print(f"Mode: {mode.value}")
-                        resize_cache = ResizeCache.build(tile_grid)
+                        resize_cx = ResizeCx.build(tile_grid)
 
                     case pg.K_KP_PLUS if mode == Mode.SCALE:
-                        assert resize_cache is not None
-                        resize_cache = resize_cache.resize(
+                        assert resize_cx is not None
+                        resize_cx = resize_cx.resize(
                             new_boundary=tile_grid.get_box().as_span().span + Cell(1, 0)
                         )
-                        tile_grid = resize_cache.tile_grid
+                        tile_grid = resize_cx.tile_grid
 
                     case pg.K_MINUS if mode == Mode.SCALE:
-                        assert resize_cache is not None
-                        resize_cache = resize_cache.resize(
+                        assert resize_cx is not None
+                        resize_cx = resize_cx.resize(
                             new_boundary=tile_grid.get_box().as_span().span - Cell(1, 0)
                         )
-                        tile_grid = resize_cache.tile_grid
+                        tile_grid = resize_cx.tile_grid
 
                     case pg.K_e:
                         print(tile_grid.get_invariant_errors())
@@ -565,15 +565,15 @@ def main_loop() -> None:
             if (e.type == pg.MOUSEBUTTONDOWN) and (
                 shared_borders.get_cross_cell() is not None
             ):
-                border_drag_cache = BorderDragCache.build(
+                border_drag_cx = BorderDragCx.build(
                     borders=shared_borders, grid=tile_grid, cursor=cursor_cell
                 )
 
             if e.type == pg.MOUSEBUTTONUP:
-                border_drag_cache = None
+                border_drag_cx = None
 
-        if border_drag_cache is not None:
-            tile_grid, shared_borders = border_drag_cache.drag(
+        if border_drag_cx is not None:
+            tile_grid, shared_borders = border_drag_cx.drag(
                 to=cursor_cell, snap_proximity=2
             )
 
